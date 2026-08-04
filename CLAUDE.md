@@ -1,0 +1,130 @@
+# insession-sdk — npm に公開する `@insession/*` の source of truth
+
+このリポジトリは **npm へ public 公開されるパッケージ群だけを置く場所**。プロダクト本体（`insession-app`）は private の別リポジトリで、ここはその外に出せる部分の入り口にあたる。
+
+**このファイルが作業規約の正。** ルート `README.md` は「このリポジトリが何か」を外部/新規開発者へ説明する文書として残してあり、**同じ規約を二重管理しない**ために、リリース手順・置き場所の判断・技術スタックの詳細はこちらへ寄せてある。README 側は要点だけ持ち、詳細はこのファイルを指す。
+
+## パッケージ一覧
+
+| ディレクトリ | パッケージ | 内容 | 依存 |
+| --- | --- | --- | --- |
+| `packages/ws-resilient-transport` | `@insession/ws-resilient-transport` | 本番デプロイの都合に合わせて再接続する WebSocket トランスポート（サービス再起動時の高速再接続 / ジッター付き指数バックオフ / terminal close code） | **なし** |
+| `packages/space-state` | `@insession/space-state` | transport・フレームワーク非依存のスペース状態 store。受信は純粋 reducer、送信は `onSend` に流すだけ、副作用は effect 記述子で返すだけ | **なし** |
+| `packages/space-state-react` | `@insession/space-state-react` | 上を React の `useSyncExternalStore` に繋ぐ薄いラッパー（1関数） | `space-state` / peer に `react` |
+
+**依存の向きは `space-state-react` → `space-state` の一方向だけ。** `ws-resilient-transport` は完全に独立していて、他の2つと繋がっていない（transport と状態管理を分けているのが設計の要点なので、ここに依存を足さない）。
+
+**「依存ゼロ」は `ws-resilient-transport` と `space-state` の売り。** 便利だからという理由でランタイム依存を1つでも足すと、このパッケージを選ぶ理由が消える。足したくなったら、まずそれが本当にこのリポジトリに置くべきものかを下記「入れるもの / 入れないもの」で判断すること。
+
+## 開発の仕方
+
+```bash
+pnpm install
+pnpm verify   # typecheck + Biome + test
+pnpm build    # 全パッケージの dist を生成
+```
+
+**`pnpm verify` が「CI と同じ判定」の単一ソース。** `.github/workflows/ci.yml` は `pnpm verify` と `pnpm build` を呼ぶだけで、個別のチェックを列挙していない。**CI 側にチェックを直接足さないこと** — 列挙すると「CI では走るが手元の `pnpm verify` では走らない」検査が静かに生まれ、PR 前の確認が CI と一致しなくなる。検査を増やすなら `package.json` の `verify` に足す。
+
+新しいパッケージを `packages/` に足すときは、既存の `ws-resilient-transport` の `package.json` / `tsup.config.ts` / `tsconfig.json` を雛形にする。
+
+## ⚠ PR を作る前に changeset を積む
+
+**changeset が無いと version が上がらず、Version PR も publish も起きない。**
+
+```bash
+pnpm changeset
+```
+
+「マージしたのに npm に出ない」という形で後から気づくことになるので、**出荷物に影響する変更なら必ず積む**。
+
+- **README も配布物**（`package.json` の `files` に入っていて npm のパッケージページに出る）。README だけの変更でも `patch` を積む
+- ドキュメントのみで npm 配布物に影響しない変更（このファイル、`.github/`、ルート `README.md`）は積まなくてよい
+- このリポジトリの CI には `changeset-required` ジョブが**無い**ので、積み忘れても PR は赤くならない。**赤くならないぶん、自分で気づくしかない**
+
+## リリース
+
+Changesets で採番し、`main` への push で npm publish する。
+
+1. `main` に push されると `release.yml` が積まれた changeset から **Version PR（`chore: version packages`）** を作る
+2. その Version PR をマージすると（＝再び `main` へ push）、同じ job が **npm publish** する
+
+### ⚠ 触ると publish が壊れる3点
+
+いずれも「壊れても手元では何も起きず、publish の瞬間に初めて失敗する」種類のもの。
+
+1. **`release.yml` の env に `NPM_TOKEN` を足さないこと。**
+   publish は npm の **Trusted Publishing（OIDC）** で行う方針で、`release.yml` は `id-token: write` を持っている。`changesets/action` は **env に `NPM_TOKEN` があればトークン publish を優先する**ため、渡すと OIDC が使われなくなる。OIDC を捨ててトークン運用に戻す判断をしたときだけ足す。
+2. **`package.json` の `publishConfig.registry` を外さないこと。**
+   開発機の `~/.npmrc` が社内プロキシを `registry` に設定していると、これが無い場合 publish がプロキシ宛になり**公開レジストリに出ない**。
+3. **`release.yml` の `npm install -g npm@11` を消さないこと。**
+   OIDC publish は npm CLI 11.5.1 以降にしか実装が無く、Node 22/24 の同梱 npm では届かない。これが無いと npm は OIDC 交換を行わず、`E404 Not Found - PUT ...` で失敗する（**npm は書き込み権限不足を 403 ではなく 404 で返す**ので「パッケージが無い」ように見えて紛らわしい）。
+
+### ⚠ OIDC publish にはリポジトリ外の設定が2つ要る
+
+兄弟リポジトリ `design-system` で publish が実際に2回連続で失敗して判明した経緯がある。**初回 publish 前に必ず両方を確認すること。** 手順の詳細はルート `README.md` の「リリース」節にある。
+
+1. **npm 側**: パッケージごとに Trusted Publisher（GitHub Actions / `insession-space` / `insession-sdk` / `release.yml`）を登録する。未登録だと OIDC トークンが認証情報に交換されず publish が E404 で落ちる
+2. **GitHub org 側**: 「Allow GitHub Actions to create and approve pull requests」をON。未許可だと Version PR が作られず採番が進まない
+
+### ローカルから publish しない
+
+npm はアカウントの 2FA か bypass 2FA 付きトークンを要求するうえ、手元から出すと **provenance の無い版がレジストリに残る**。publish は CI（OIDC）経由が基本。
+
+## ⚠ このリポジトリに入れるもの / 入れないもの
+
+**入れるのは「契約とランタイム」だけ。** プロダクトの意見を持たない、InSession が無くても意味が通るものに限る。
+
+| 入れる | 入れない |
+| --- | --- |
+| 汎用のランタイム（`ws-resilient-transport`。InSession 固有の情報を1つも含まない） | **plugin**（`plugin-pomodoro` 等）。UI・i18n キー・プロダクト判断を抱えるので `insession-app` 側に置く |
+| 依存ゼロの状態機械（`space-state`）とその薄いバインディング（`space-state-react`） | **UI を持つもの全般**。`@insession/design-system` への依存をこのリポジトリに持ち込まない |
+
+**「`@insession/*` スコープだから」という理由だけでここへ移さないこと。** スコープは「OSS 候補である」という表明でしかなく、置き場所の判断とは別。plugin をここへ入れると次の3つが同時に起きる:
+
+1. **SDK が design-system に依存する** — UI プリミティブを直すたびに design-system → insession-sdk → insession-app の**3リポジトリ往復**になる
+2. **共有物の消費者が向こう側に残る** — plugin の道具は space の plugin と本体側の両方が使い、どちらも `insession-app` 内に居る。切り出すとパネルを 1px 直すたびに publish サイクルが要る
+3. **リリース周期が混ざる** — 契約層は安定していてほしいが、plugin はプロダクトと一緒に動く。同居させると採番が互いに引きずられる
+
+外部に「space を作れる SDK」を出すのに plugin は必須ではない。`definePluginClient` の**契約さえ配れば、消費者は自分の plugin を書ける**。plugin 自体を配りたくなったら、このリポジトリに足すのではなく別リポジトリを立てて判断する。
+
+## README は「外部公開の配布物」
+
+各パッケージの `README.md` は `files` に含まれ、**npm のパッケージページにそのまま表示される**。したがって:
+
+- **英語で書く。** 3パッケージで見出し構成（冒頭のフック → Install → Usage → API 表 → Test → License）とトーンを揃える
+- **リポジトリ外を参照する記述を書かない** — 社内 Issue 番号、private リポジトリのパッケージ名やシンボル（`@in-session/*` 等）、消費側リポジトリにしか無いスクリプト。外部読者には解決できず、そのまま「読めないドキュメント」として公開される
+- **コード例は実装と一致させる。** 書いたら実際に動かして確かめる（過去に `effect.kind` で分岐する例が載っていたが、実際の判別子は `effect.type` だった）
+
+ルート `README.md` は npm には出ない（配布物ではない）ので、この制約の対象外。
+
+## 技術スタック / 規約
+
+- **pnpm 10.12.1**（npm / yarn は使わない）・**Node >= 22.18**・**TypeScript**
+- **Biome**（lint + format。ESLint / Prettier は使わない）。`pnpm check` / `pnpm format`
+- **Changesets** で採番
+- ビルドは **tsup**。`dist`（`.js` + `.d.ts`）を配布する。**`.ts` ソースをそのまま配らないこと** — Node は `node_modules` 配下の `.ts` を型ストリップしないため、サーバー側の消費者が読めない
+- 各パッケージ内の相対 import は**拡張子 `.ts` を明示**する（`./actions.ts` 等）
+- 兄弟リポジトリ `design-system`（`insession-space/design-system`）と同じ設計・作法を踏襲している。設定に迷ったらそちらを参照する
+
+## リポジトリを跨いだ操作をしない
+
+このリポジトリは、作業ルートに並ぶ複数の独立した Git リポジトリのうちの1つ。
+
+- `git` / `pnpm` の**すべてのコマンドはこのディレクトリ内で実行**する。親ディレクトリは Git リポジトリではなく、`package.json` も lockfile も無い
+- **1つの変更を複数リポジトリに同時コミットすることはできない。** 跨ぐ変更は「SDK を直す → publish → 消費側で版を上げる」のようにリポジトリごとに別 PR に分ける
+- Issue / PR も各リポジトリに独立して立つ（`gh` は `-R insession-space/insession-sdk` かこのディレクトリ内で使う）
+
+## ブランチとマージ
+
+- **既定ブランチは `main`。** `develop` は存在しない。起点は直書きせず解決する: `git symbolic-ref --short refs/remotes/origin/HEAD | sed 's|^origin/||'`
+- マージ方式は squash / merge commit / rebase のいずれも有効。迷ったら設定を引く: `gh api repos/insession-space/insession-sdk --jq '{squash:.allow_squash_merge, merge:.allow_merge_commit, rebase:.allow_rebase_merge}'`
+- **`main` を直接編集しない。** `main` への push が採番 → publish を引き起こす。作業はブランチ（worktree）で行う
+- ブランチは worktree でチェックアウトされていることが多い。**ローカルブランチを消す前に `git worktree remove` する**（順序が逆だと消せない）
+- CI は **draft PR ではスキップされる**（実行分課金の節約）。検証を CI に回したいなら ready for review にすること。手元の `pnpm verify` + `pnpm build` は draft でも当然回せる
+
+## シークレット
+
+**このリポジトリはローカルに秘密を持たない。** `.env` は無く、`pnpm install` と `pnpm verify` は認証情報を一切要求しない。publish の認証は CI の OIDC だけで完結していて、**長期のトークンや鍵はリポジトリにも GitHub Secrets にも存在しない**（`GITHUB_TOKEN` は Actions が自動発行するもの）。
+
+> ⚠ **万一値を扱う場面があっても、ログ・ファイル・コミットメッセージ・PR 本文・チャットに出さないこと。** マスクや部分表示も含めて出さない。一度出た値はローテーションするしかなくなる。**サブエージェントに委譲するときはこの制約をプロンプトに明記する**（委譲先はこのファイルを読まないことがある）。
