@@ -1,0 +1,18 @@
+{
+  // @insession/space-state-react は React の useSyncExternalStore だけを使う薄いラッパー。
+  // JSX は持たないので jsx オプションは付けない。tsc は型検査専用（noEmit）。
+  // 配布物(dist)の生成は tsup が行う（tsup.config.ts）。
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node", "react"],
+    // package.json の exports は publish 後の消費者向けに dist/index.d.ts を指すが、
+    // ローカルの typecheck を dist のビルド有無に依存させないため、型解決だけソースへ逸らす
+    // （実行時解決は変えない。tsup の外部化とパッケージ実体の resolve は package.json のまま）。
+    "paths": {
+      "@insession/space-state": ["../space-state/index.ts"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["dist", "node_modules"]
+}

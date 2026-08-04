@@ -1,0 +1,51 @@
+{
+  "name": "@insession/space-state",
+  "version": "0.1.0",
+  "description": "transport/フレームワーク非依存のスペース状態 store。受信は純粋 reducer、送信は onSend に流すだけ。副作用（音/通知/タイマー/送信）は effects 記述子で返し、実行は消費者（useSpace）が担う",
+  "//": "元は insession-app の packages/space-state にあり、.ts ソースのまま消費されていた（Vite / Node のネイティブ型ストリップが解決するため、モノレポ内ではビルド不要だった）。別リポジトリ化に伴い dist（.js + .d.ts）を配布する形にした。依存はゼロ（React・WebSocket・DOM・@in-session/protocol いずれにも依存しない）。",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "state",
+    "store",
+    "reducer",
+    "realtime",
+    "sync",
+    "presence"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/insession-space/insession-sdk.git",
+    "directory": "packages/space-state"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "//publishConfig": "registry を明示するのは必須。開発機の ~/.npmrc が社内プロキシを registry に設定している場合、これが無いと npm publish がプロキシ宛になり公開レジストリへ出ない（design-system と同じ理由）。",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "node --test",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "//dependencies": "依存ゼロ。これがこのパッケージの売り（React・WebSocket・DOM・@in-session/protocol いずれにも依存しない）。",
+  "dependencies": {},
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0"
+  }
+}

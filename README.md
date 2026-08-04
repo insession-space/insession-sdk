@@ -11,8 +11,10 @@ InSession 本体（[`insession-app`](https://github.com/insession-space/insessio
 
 第一弾は `packages/ws-resilient-transport`（`@insession/ws-resilient-transport`）。
 サービス再起動時の高速再接続とジッター付き指数バックオフを両立する、依存ゼロの
-WebSocket 再接続トランスポート。将来的に space-state / space-state-react /
-plugin-pomodoro / pomodoro-kit もここへ移設する前提で骨組みを作ってある。
+WebSocket 再接続トランスポート。続けて `packages/space-state`（`@insession/space-state`。
+依存ゼロのスペース状態 store）と `packages/space-state-react`（`@insession/space-state-react`。
+その React バインディング）を移設済み。将来的に plugin-pomodoro / pomodoro-kit も
+ここへ移設する前提で骨組みを作ってある。
 
 ## なぜ InSession 本体から分かれているか
 
@@ -93,7 +95,9 @@ CI（OIDC）経由が基本。手元から publish すると provenance の無�
 ```
 insession-sdk/
 ├── packages/
-│   └── ws-resilient-transport/   # @insession/ws-resilient-transport
+│   ├── ws-resilient-transport/   # @insession/ws-resilient-transport
+│   ├── space-state/              # @insession/space-state
+│   └── space-state-react/        # @insession/space-state-react
 ├── .changeset/
 └── .github/workflows/
     ├── ci.yml       # PR / main push の検証（typecheck + Biome + test + build）
@@ -107,7 +111,7 @@ insession-sdk/
 | 入れる | 入れない |
 | --- | --- |
 | `ws-resilient-transport`（汎用の WebSocket 再接続。InSession 固有の情報を1つも含まない） | **plugin**（`plugin-pomodoro` 等）。UI・i18n キー・プロダクト判断を抱えるので insession-app 側に置く |
-| `space-state` / `space-state-react`（依存は protocol だけの状態機械と、その React バインディング） | **UI を持つもの全般**。`@insession/design-system` への依存をこのリポジトリに持ち込まない |
+| `space-state`（依存ゼロの状態機械） / `space-state-react`（React バインディング。依存は space-state 本体のみ） | **UI を持つもの全般**。`@insession/design-system` への依存をこのリポジトリに持ち込まない |
 
 **「`@insession/*` スコープだから」という理由だけでここへ移さないこと。** スコープは「OSS 候補である」という表明でしかなく、置き場所の判断とは別。plugin をここへ入れると次の3つが同時に起きる:
 
