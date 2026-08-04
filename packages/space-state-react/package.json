@@ -1,0 +1,59 @@
+{
+  "name": "@insession/space-state-react",
+  "version": "0.1.0",
+  "description": "@insession/space-state を React の useSyncExternalStore に繋ぐ薄いラッパー",
+  "//": "元は insession-app の packages/space-state-react にあり、.ts ソースのまま消費されていた。別リポジトリ化に伴い dist（.js + .d.ts）を配布する形にした。ロジックは一切持たない（1関数・約10行）。",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "state",
+    "store",
+    "react",
+    "useSyncExternalStore",
+    "realtime",
+    "sync"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/insession-space/insession-sdk.git",
+    "directory": "packages/space-state-react"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "//publishConfig": "registry を明示するのは必須。開発機の ~/.npmrc が社内プロキシを registry に設定している場合、これが無いと npm publish がプロキシ宛になり公開レジストリへ出ない（design-system と同じ理由）。",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "node --test",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "//dependencies": "workspace 参照。同じリポジトリ内なのでこれでよい。publish 時は changesets が実バージョンへ書き換える。",
+  "dependencies": {
+    "@insession/space-state": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "//devDependencies": "ルートの catalog は使わず、このリポジトリでは素直にバージョンを書く（../insession-app/pnpm-workspace.yaml の catalog と同じ版に揃えてある）。",
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "react": "^19.2.7",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0"
+  }
+}
