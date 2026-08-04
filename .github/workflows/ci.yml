@@ -1,0 +1,49 @@
+name: CI
+
+# 決定論的な検証チャネル（モデルのトークンを使わずに壊れを検出する）。
+#
+# ⚠ ここに個別のチェックを列挙しないこと。検査の中身は package.json の `verify` が単一ソースで、
+# この workflow はそれと `build` を呼ぶだけにしてある。列挙すると「CI では走るが手元の
+# pnpm verify では走らない」チェックが静かに生まれ、PR 前の確認が CI と一致しなくなる。
+on:
+  push:
+    branches: [main]
+  # insession-app の #1263 に倣う: draft の間は回さず、ready for review になってから回す。
+  # types を明示するのは ready_for_review を足すため（未指定の既定は opened / synchronize /
+  # reopened のみで、draft 解除ではイベントが発火しない）。synchronize は残す —
+  # ready 後の push も検証しないと、ready 直前のコミットの結果を最新扱いしたままマージできてしまう。
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # draft PR では全ジョブをスキップする（実行分課金の節約）。push(main) では
+  # github.event.pull_request が null なので `!null` が true に倒れ、従来どおり回る —
+  # ここを `== false` 等に書き換えると main の検証が無言で死ぬ。draft はそもそも
+  # マージできないため、required status check が skipped 扱いになっても実害はない。
+  verify:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # 型検査 / lint / test。中身は package.json の verify を見ること。
+      - name: Verify
+        run: pnpm verify
+
+      # 配布物(dist)が実際にビルドできることの担保。publish 前提の内容確認は
+      # `npm pack --dry-run` で別途行う（このリポジトリの手順を参照）。
+      - name: Build
+        run: pnpm build

@@ -1,0 +1,75 @@
+name: Release
+
+# Changesets によるバージョン採番と npm publish。
+#   1. main へ push されると、積まれた changeset から「chore: version packages」PR を自動作成する
+#   2. その Version PR をマージすると（= 再度 main へ push）、この job が npm publish する
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  # npm の Trusted Publishing（OIDC）に必須。これが無いと publish できない。
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      # ⚠ npm の Trusted Publishing(OIDC)は npm CLI 11.5.1 以降でしか実装されていない。
+      # Node の同梱 npm では届かないため、明示的に上げる:
+      #   Node 22.23.1 → npm 10.9.8 / Node 24.0.0 → npm 11.3.0（どちらも 11.5.1 未満）
+      # これが無いと npm は OIDC 交換を行わず、認証情報なしで publish しようとして
+      # `E404 Not Found - PUT https://registry.npmjs.org/...` で失敗する。npm は書き込み
+      # 権限不足を 403 ではなく 404 で返すため、「パッケージが無い」ように見えて紛らわしい
+      # （design-system の release.yml で実際に起きた）。publish は changesets が内部で
+      # `npm publish` を呼ぶので、npm CLI 自体の版が効く。
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@11
+
+      - run: pnpm install --frozen-lockfile
+
+      # publish されるのは dist なので、publish 前に必ず作り直す。
+      - name: Build dist
+        run: pnpm build
+
+      - name: Create Version PR or publish
+        uses: changesets/action@v1
+        with:
+          version: pnpm changeset:version
+          publish: pnpm changeset publish
+          commit: 'chore: version packages'
+          title: 'chore: version packages'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # ⚠ NPM_TOKEN は意図的に渡さない。
+        # changesets/action は「env に NPM_TOKEN があればトークン publish、無ければ
+        # OIDC（Trusted Publishing）」の順で選ぶため、トークンを渡すと OIDC が使われなくなる。
+        # OIDC が使えない状況に戻す場合のみ、ここに NPM_TOKEN を足すこと。
+        #
+        # ⚠ この job が動くには、リポジトリ外の設定が2つ必要（README「リリース」節を参照）:
+        #   1. npm 側で Trusted Publisher の登録（insession-space/insession-sdk + release.yml
+        #      + パッケージごと）。未登録だと OIDC トークンが認証情報に交換されず、publish が
+        #      E404 で失敗する。
+        #   2. GitHub org 側で「Allow GitHub Actions to create and approve pull requests」をON。
+        #      未許可だと Version PR の作成が弾かれる（採番と push までは成功する）。
+        # design-system（insession-space/design-system）の 1.4.0 publish 試行で両方とも
+        # 未設定だったことが判明した経緯があるため、このリポジトリでも初回 publish 前に
+        # 必ず両方を確認すること。

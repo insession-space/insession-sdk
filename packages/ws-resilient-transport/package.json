@@ -1,0 +1,50 @@
+{
+  "name": "@insession/ws-resilient-transport",
+  "version": "0.1.0",
+  "description": "A tiny, dependency-free WebSocket transport that reconnects the way a production deploy needs it to: fast reconnect on service restart, jittered exponential backoff otherwise, and terminal close codes that stop reconnection.",
+  "//": "元は insession-app の packages/ws-resilient-transport にあり、.ts ソースのまま消費されていた（Vite / Node のネイティブ型ストリップが解決するため、モノレポ内ではビルド不要だった）。別リポジトリ化に伴い dist（.js + .d.ts）を配布する形にした。Node は node_modules 配下の .ts を型ストリップしないため、サーバー側の消費者にとってもビルド済みの方が素直（インストールした依存の中身までは型ストリップの対象にならない）。",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "websocket",
+    "reconnect",
+    "reconnecting",
+    "backoff",
+    "jitter",
+    "realtime",
+    "transport"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/insession-space/insession-sdk.git",
+    "directory": "packages/ws-resilient-transport"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "//publishConfig": "registry を明示するのは必須。開発機の ~/.npmrc が社内プロキシを registry に設定している場合、これが無いと npm publish がプロキシ宛になり公開レジストリへ出ない（design-system と同じ理由）。",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "node --test",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0"
+  }
+}

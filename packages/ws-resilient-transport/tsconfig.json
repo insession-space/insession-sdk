@@ -1,0 +1,10 @@
+{
+  // ws-resilient-transport はブラウザ WebSocket を前提にした ESM。tsc は型検査専用（noEmit）。
+  // 配布物(dist)の生成は tsup が行う（tsup.config.ts）。
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["dist", "node_modules"]
+}

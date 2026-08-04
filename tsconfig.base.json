@@ -1,0 +1,34 @@
+{
+  // insession-sdk 全パッケージ共通の型検査方針。各パッケージの tsconfig.json がこれを extends する。
+  // tsc は型検査専用（noEmit）。実行/配布物の生成は各パッケージの tsup（build）または
+  // Node のネイティブ型ストリップ（test）が行う。insession-app の tsconfig.base.json と
+  // 値を揃えて保守する（このリポジトリは insession-app から独立しているため extends できず、
+  // インライン化してある）。
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "types": ["node"],
+
+    // import/export を持たないファイルも常にモジュール扱いにする。
+    "moduleDetection": "force",
+    // require('./x.ts') / import './x.ts' の拡張子付き解決を許可(noEmit 前提)。
+    // index.test.ts が './index.ts' のように拡張子付きで import するため必須。
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // 高シグナル・低コストなバグ検出フラグ。
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // strict は段階導入（insession-app / design-system と同じ方針を引き継ぐ）。
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false
+  }
+}

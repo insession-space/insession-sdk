@@ -1,0 +1,13 @@
+# 依存関係
+node_modules/
+
+# ビルド成果物（配布物は各パッケージが tsup で生成する。ソース管理しない）
+dist/
+*.tsbuildinfo
+
+# ローカル環境
+.DS_Store
+*.log
+
+# pnpm
+.pnpm-store/
