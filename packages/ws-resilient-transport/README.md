@@ -1,4 +1,4 @@
-# ws-resilient-transport
+# @insession/ws-resilient-transport
 
 A tiny (~130 LOC), **dependency-free** WebSocket transport that reconnects the
 way a production deployment actually needs it to.
@@ -35,8 +35,7 @@ npm install @insession/ws-resilient-transport
 ```
 
 Published as a built ESM package (`dist/index.js` + `dist/index.d.ts`), no
-runtime dependencies. (Previously this lived inside the InSession monorepo and
-was vendored as a source module; see "Origin" below.)
+runtime dependencies.
 
 ## Usage
 
@@ -116,7 +115,7 @@ first reconnect after `serviceRestartCode`, which uses `serviceRestartDelay`.
 ## Test
 
 ```sh
-pnpm test
+node --test
 ```
 
 The tests use a fake WebSocket plus injected timers and RNG, so they are fully
@@ -124,10 +123,10 @@ deterministic (no real sockets, no wall-clock waits).
 
 ## Origin
 
-Extracted from [InSession](https://insession.space)'s realtime sync layer
-(`@in-session/sync`), where it keeps synchronized watch-party sessions alive
-across deploys. See the "OSS candidate" write-up for how it was generalized
-(protocol types → generics, `1012`/`4001` → configurable close codes).
+Extracted from [InSession](https://insession.space)'s realtime sync layer, where
+it keeps synchronized watch-party sessions alive across deploys. Generalizing it
+meant replacing the product's protocol types with generics and turning the
+hard-coded close codes into configuration.
 
 ## License
 
