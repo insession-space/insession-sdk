@@ -50,6 +50,7 @@ export default defineConfig({
           items: [
             { label: 'ws-resilient-transport', slug: 'packages/ws-resilient-transport' },
             { label: 'space-state', slug: 'packages/space-state' },
+            { label: 'chat-state', slug: 'packages/chat-state' },
             { label: 'space-state-react', slug: 'packages/space-state-react' },
             { label: 'plugin-pomodoro-state', slug: 'packages/plugin-pomodoro-state' },
             { label: 'plugin-whiteboard-state', slug: 'packages/plugin-whiteboard-state' },
@@ -63,6 +64,7 @@ export default defineConfig({
             { label: 'pomodoro', slug: 'examples/pomodoro' },
             { label: 'whiteboard', slug: 'examples/whiteboard' },
             { label: 'watch-party', slug: 'examples/watch-party' },
+            { label: 'chat', slug: 'examples/chat' },
             { label: 'space-state', slug: 'examples/space-state' },
             { label: 'space-state-react', slug: 'examples/space-state-react' },
           ],

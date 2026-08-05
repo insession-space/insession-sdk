@@ -24,6 +24,7 @@
   "dependencies": {
     "@astrojs/react": "^4.4.2",
     "@astrojs/starlight": "^0.36.0",
+    "@insession/chat-state": "workspace:*",
     "@insession/plugin-pomodoro-state": "workspace:*",
     "@insession/plugin-watch-party-state": "workspace:*",
     "@insession/plugin-whiteboard-state": "workspace:*",

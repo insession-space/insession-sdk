@@ -1,0 +1,93 @@
+---
+title: 'Chat'
+description: A live demo of @insession/chat-state — messages, stickers, replies, reactions and a pinned message, with the host role played by the page so every effect descriptor is visible.
+---
+
+import ChatDemo from '../../../components/examples/ChatDemo.tsx';
+
+This package holds almost no state. A chat transcript belongs in your
+database, not in memory, so what `@insession/chat-state` actually owns is the
+*decisions* — what counts as a message, what goes on the wire, and which side
+effects the host has to perform.
+
+That makes it the clearest place on this site to watch the effect-descriptor
+pattern work. The demo below plays the **host**: it runs a fake database that
+hands out ids, and it delivers each `broadcast` to the members' inboxes. The
+package itself does no I/O at all — every call below is a pure function
+returning `{ state, effects }`.
+
+<ChatDemo client:only="react" />
+
+## What to try
+
+- Press **text** and read the two inboxes. Alice (the sender) gets `ack: my
+  message is now #1`; Bob gets the message itself. That asymmetry is the
+  point — the sender already rendered their own text optimistically, so the
+  broadcast excludes them and the ack carries the one thing they're missing:
+  the persisted id.
+- Watch the **calls** pane on that same press. One click produces *two*
+  `reduce` calls: `chat` returns a `persist-chat` effect, the host stores the
+  draft and gets an id back, and only then does `chat-persisted` produce the
+  broadcast. The id doesn't exist until the message is stored, which is
+  exactly why it can't be one step.
+- Press **whitespace only**. `reduce` returns `null` — the action is dropped
+  entirely rather than broadcasting an empty line.
+- Press **sticker (own URL)**, then **sticker (other URL)**. The page's own
+  allowlist (`https://cdn.example.com/stickers/…`) decides, and folds the
+  answer into `stickerAllowed`. The rejected one doesn't error — it falls
+  back to a plain text message carrying its caption. A revoked sticker should
+  never silently swallow something you also had to say.
+- Press **reply to last**, then **text**. The broadcast now carries a
+  snapshot of the parent, not a live reference — quoting is a record of what
+  was said.
+- Press **react 🔥**, then **react "nice!"**. The first returns a
+  `toggle-reaction` effect; the second returns `null`. Reaction emoji are
+  validated structurally — exactly one user-perceived character containing a
+  pictographic code point — so any emoji works and a sentence doesn't. Note
+  that `chat-reaction-update` goes to *everyone*, sender included: the
+  aggregate is something only the server can compute.
+- Press **pin last**, then **unpin**. This is the only thing in the whole
+  package that changes `state`. Pinning takes a `resolve-message` round trip
+  because the host has to look the message up; unpinning doesn't, because
+  there's nothing to look up.
+- Press **typing**. It broadcasts and touches nothing — a typing indicator is
+  never stored and never restored.
+
+## The code behind it
+
+The demo imports the published package and nothing else:
+
+```ts
+import { createChatState } from '@insession/chat-state';
+
+const chat = createChatState();
+let state = chat.defaultState();
+
+// Step 1: normalize and validate. `by`/`uid`/`stickerAllowed` come from the
+// host, never from the wire.
+const first = chat.reduce(state, 'chat', {
+  text: 'hello there',
+  clientMsgId: 'c-1',
+  by: 'Alice',
+  uid: 'u-Alice',
+  stickerAllowed: false,
+});
+
+// Step 2: the host runs the `persist-chat` effect, then feeds the id back.
+for (const effect of first?.effects ?? []) {
+  if (effect.type !== 'persist-chat') continue;
+  const id = await db.insertMessage(effect.draft);
+  const second = chat.reduce(state, 'chat-persisted', { draft: effect.draft, id });
+  // second.effects now holds the broadcast (sender excluded), the sender's
+  // chat-ack, and a notify-bots effect you must never await.
+  if (second) state = second.state;
+}
+```
+
+`reduce` is a pure function — no I/O, no storage, no transport — and the only
+impure thing anywhere in the package is `Date.now()`, which you can inject.
+That's what lets the same state machine run on a server, in a test, or in
+this page.
+
+See the [package reference](/packages/chat-state/) for the full action list,
+the host-trusted payload fields, and the persistence helpers (`restore`).

@@ -1,0 +1,82 @@
+---
+title: 'チャット'
+description: '@insession/chat-state の実動作デモ。メッセージ・スタンプ・返信・リアクション・ピン留めを、host 役をページが演じることで effect 記述子が見える形で確認できます。'
+---
+
+import ChatDemo from '../../../../components/examples/ChatDemo.tsx';
+
+このパッケージはほとんど state を持ちません。チャットのログはメモリではなくデータベースに
+置くものなので、`@insession/chat-state` が実際に担っているのは**判断**です — 何をメッセージと
+見なすか、何を wire に流すか、そして host がどの副作用を実行しなければならないか。
+
+そのぶん、このサイトの中で effect 記述子のパターンが最も素直に見える場所でもあります。
+下のデモは **host 役**を演じます: id を採番する偽のデータベースを持ち、`broadcast` を各メンバーの
+受信箱へ配ります。パッケージ自身は I/O を一切しません — 以下の呼び出しはすべて
+`{ state, effects }` を返す純関数です。
+
+<ChatDemo client:only="react" />
+
+## 試してみること
+
+- **text** を押して、2つの受信箱を読み比べてください。送信者の Alice には
+  `ack: my message is now #1` が届き、Bob にはメッセージ本体が届きます。この非対称が要点です —
+  送信者は enter を押した瞬間に自分のメッセージを楽観的に描画済みなので、broadcast からは除外され、
+  代わりに ack が「手元のコピーに欠けている唯一のもの」＝永続 id を運びます。
+- 同じ操作で **calls** ペインを見てください。1クリックで `reduce` が**2回**呼ばれています:
+  `chat` が `persist-chat` を返し、host が draft を保存して id を得て、そのあと初めて
+  `chat-persisted` が broadcast を作ります。id は保存するまで存在しない — それが1段にできない
+  理由そのものです。
+- **whitespace only** を押すと `reduce` は `null` を返します。空行を配信するのではなく、
+  アクションごと捨てられます。
+- **sticker (own URL)** と **sticker (other URL)** を続けて押してください。判定するのはページ側の
+  allowlist（`https://cdn.example.com/stickers/…`）で、その答えを `stickerAllowed` に畳み込んで
+  渡しています。拒否された方はエラーにならず、キャプションを持ったただのテキストメッセージに
+  落ちます。取り消されたスタンプが、一緒に書いた本文まで黙って飲み込んではいけないからです。
+- **reply to last** を押してから **text** を送ると、broadcast は親メッセージへの参照ではなく
+  **スナップショット**を運びます。引用は「そのとき何が言われたか」の記録だからです。
+- **react 🔥** と **react "nice!"** を続けて押してください。前者は `toggle-reaction` を返し、
+  後者は `null` を返します。リアクションの絵文字は構造で検証しています — 絵文字図形を含む
+  書記素クラスタがちょうど1つ — なので任意の絵文字が通り、文章は通りません。なお
+  `chat-reaction-update` は送信者を含む**全員**に届きます: 集計はサーバーにしか計算できないため、
+  楽観的に描画しておけるものが何も無いからです。
+- **pin last** と **unpin** を押してください。パッケージ全体で `state` が変わるのはここだけです。
+  ピン留めは host がメッセージを引く必要があるので `resolve-message` の往復を挟みますが、
+  解除は引くものが無いので往復しません。
+- **typing** は broadcast するだけで何も触りません — 入力中インジケーターは保存も復元もしません。
+
+## 裏で動いているコード
+
+デモが import しているのは公開パッケージだけです:
+
+```ts
+import { createChatState } from '@insession/chat-state';
+
+const chat = createChatState();
+let state = chat.defaultState();
+
+// 1段目: 正規化と検証。by / uid / stickerAllowed は host が入れる（wire の値を通さない）。
+const first = chat.reduce(state, 'chat', {
+  text: 'hello there',
+  clientMsgId: 'c-1',
+  by: 'Alice',
+  uid: 'u-Alice',
+  stickerAllowed: false,
+});
+
+// 2段目: host が persist-chat を実行し、採番された id を返す。
+for (const effect of first?.effects ?? []) {
+  if (effect.type !== 'persist-chat') continue;
+  const id = await db.insertMessage(effect.draft);
+  const second = chat.reduce(state, 'chat-persisted', { draft: effect.draft, id });
+  // second.effects に broadcast（送信者除外）・送信者への chat-ack・
+  // 決して await してはいけない notify-bots が入る。
+  if (second) state = second.state;
+}
+```
+
+`reduce` は純関数です — I/O もストレージもトランスポートも持たず、パッケージ全体で唯一
+「純粋でない」ものは `Date.now()` だけで、それすら注入できます。同じ状態機械がサーバーでも
+テストでもこのページでも動くのはそのためです。
+
+アクションの全一覧・host が埋めるべきフィールド・永続化のヘルパー（`restore`）は
+[パッケージリファレンス](/ja/packages/chat-state/)を参照してください。
