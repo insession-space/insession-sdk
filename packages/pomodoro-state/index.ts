@@ -81,6 +81,13 @@ export interface PomodoroPayload {
   uid?: unknown;
   /** `cheer`: the display name of the declaration being cheered. */
   target?: unknown;
+  /**
+   * Payload is untrusted wire data assembled by the host (typically
+   * `{ ...wirePayload, by: memberName, uid: client.uid }`), so it may carry
+   * fields beyond the ones named above — this keeps that assignable without
+   * a cast.
+   */
+  [key: string]: unknown;
 }
 
 const MIN_MINUTES = 1;
@@ -216,8 +223,16 @@ export function reduce(
       const by = payload?.by;
       if (!by || typeof by !== 'string') return null;
       const text = clampDeclarationText(payload?.text);
-      const uid = (payload?.uid as string | null | undefined) ?? null;
-      const prev = s.declarations[by];
+      const uid = typeof payload?.uid === 'string' ? payload.uid : null;
+      // `Object.hasOwn` guard: `by` is wire-controlled, so a value like
+      // `'constructor'` or `'toString'` must not resolve to an inherited
+      // `Object.prototype` member instead of "no existing declaration".
+      // Without this guard `s.declarations[by]` would return e.g.
+      // `Object.prototype.constructor` (a function), and reading `.text`
+      // off it below would either throw or silently misbehave. This bug
+      // pre-dates the port (the source this package was ported from has the
+      // same issue); it's fixed here rather than reproduced.
+      const prev = Object.hasOwn(s.declarations, by) ? s.declarations[by] : undefined;
       if (!text) {
         if (!prev) return null; // already undeclared → no-op
         const declarations = { ...s.declarations };
@@ -238,7 +253,11 @@ export function reduce(
       const by = payload?.by;
       if (!target || typeof target !== 'string' || !by || typeof by !== 'string' || target === by)
         return null;
-      const decl = s.declarations[target];
+      // See the `declare` case above for why this can't be a plain
+      // `s.declarations[target]` lookup: `target` is wire-controlled and a
+      // name like `'constructor'` would otherwise resolve to an inherited
+      // `Object.prototype` value instead of "not declared".
+      const decl = Object.hasOwn(s.declarations, target) ? s.declarations[target] : undefined;
       if (!decl) return null;
       const cheered = decl.cheers.includes(by);
       const cheers = cheered ? decl.cheers.filter((name) => name !== by) : [...decl.cheers, by];
@@ -249,8 +268,11 @@ export function reduce(
     case 'join': {
       const by = payload?.by;
       if (!by || typeof by !== 'string') return null;
-      const uid = (payload?.uid as string | null | undefined) ?? null;
-      const prev = s.participants[by];
+      const uid = typeof payload?.uid === 'string' ? payload.uid : null;
+      // Same `Object.hasOwn` guard as `declare`/`cheer`: `by` is
+      // wire-controlled, so it must not be able to resolve to an inherited
+      // `Object.prototype` member.
+      const prev = Object.hasOwn(s.participants, by) ? s.participants[by] : undefined;
       if (prev && prev.uid === uid) return null; // no-op
       return { ...s, participants: { ...s.participants, [by]: { uid } } };
     }
@@ -259,7 +281,8 @@ export function reduce(
     case 'leave': {
       const by = payload?.by;
       if (!by || typeof by !== 'string') return null;
-      if (!s.participants[by]) return null; // wasn't participating → no-op
+      // Same `Object.hasOwn` guard as `declare`/`cheer`/`join` above.
+      if (!Object.hasOwn(s.participants, by)) return null; // wasn't participating → no-op
       const participants = { ...s.participants };
       delete participants[by];
       return { ...s, participants };

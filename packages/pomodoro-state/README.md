@@ -99,7 +99,7 @@ function saveToDb() {
 | `pause` | — | Stops the timer, freezing `remaining`. No-op if already stopped. |
 | `reset` | — | Re-initializes phase/cycles/timer, but **keeps** `config`, `declarations`, and `participants`. |
 | `skip` | — | Advances to the next phase immediately, without counting a completed cycle. |
-| `configure` | `{ workMinutes?, breakMinutes? }` | Sets phase lengths (clamped 1–120 min). Only while stopped. |
+| `configure` | `{ workMinutes?, breakMinutes? }` | Sets phase lengths (clamped 1–120 min). Only while stopped. Values that convert to a number (including `null`, `''`, `false`, `[]`, which all convert to `0`) are clamped to 1 minute rather than falling back to the current config — only values that don't convert to a finite number (e.g. `'nope'`, `undefined`) fall back. |
 | `declare` | `{ by, text?, uid? }` | Sets (or, with empty `text`, clears) `by`'s one-line declaration. |
 | `cheer` | `{ target, by }` | Toggles `by`'s cheer on `target`'s declaration. No-op on self-cheers or undeclared targets. |
 | `join` | `{ by, uid? }` | Marks `by` as participating in this session. |

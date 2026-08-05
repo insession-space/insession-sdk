@@ -126,12 +126,24 @@ test('configure: clamps minutes above MAX_MINUTES down to 120 minutes', () => {
   assert.equal(next?.config.break, 120 * 60);
 });
 
-test('configure: non-numeric values fall back to the existing config', () => {
+test('configure: values that fail Number() conversion fall back to the existing config', () => {
   const s = defaultState();
   const next = reduce(s, 'configure', { workMinutes: 'nope', breakMinutes: undefined });
   assert.ok(next);
   assert.equal(next?.config.work, s.config.work);
   assert.equal(next?.config.break, s.config.break);
+});
+
+test('configure: values that convert to 0 (null, "", false, []) clamp to 1 minute rather than falling back', () => {
+  // Number(null) === 0, Number('') === 0, Number(false) === 0, Number([]) === 0 —
+  // all finite, so clampMinutes clamps them to MIN_MINUTES instead of using the
+  // fallback path (which only triggers on non-finite conversions like NaN).
+  for (const value of [null, '', false, []]) {
+    const next = reduce(defaultState(), 'configure', { workMinutes: value, breakMinutes: value });
+    assert.ok(next);
+    assert.equal(next?.config.work, 60, `workMinutes: ${JSON.stringify(value)}`);
+    assert.equal(next?.config.break, 60, `breakMinutes: ${JSON.stringify(value)}`);
+  }
 });
 
 test('configure: updates remaining to match the current phase duration', () => {
@@ -370,7 +382,9 @@ test('restore: caps declarations at 200 and cheers at 200, deduping cheers', () 
   assert.ok(next);
   const cheers = next?.declarations.alice.cheers ?? [];
   assert.equal(new Set(cheers).size, cheers.length); // deduped
-  assert.ok(cheers.length <= 200);
+  // manyCheers dedupes down to 210 distinct names before the cap is applied,
+  // so the capped result is always exactly 200, not merely "at most" 200.
+  assert.equal(cheers.length, 200);
 });
 
 test('restore: participants is always empty regardless of input', () => {
@@ -397,10 +411,12 @@ test('restore: falls back to defaults for missing/invalid config, phase, cycles'
 });
 
 // Member-name payload fields are rejected when they aren't strings, rather
-// than being coerced into an object key. This is the one intentional
-// behavioral difference from the implementation this package was ported from,
-// which relied on JavaScript's implicit key coercion (`decls[5]` → `decls['5']`)
-// and could therefore let a non-string reach the `cheers: string[]` array.
+// than being coerced into an object key. This is one of a few intentional
+// behavioral differences from the implementation this package was ported
+// from, which relied on JavaScript's implicit key coercion (`decls[5]` →
+// `decls['5']`) and could therefore let a non-string reach the
+// `cheers: string[]` array. (See below for the other differences: rejecting
+// `Object.prototype`-inherited member names, and normalizing `uid`.)
 test('reduce: non-string member names are rejected, not coerced', () => {
   for (const by of [5, true, { toString: () => 'alice' }, ['alice']]) {
     assert.equal(reduce(null, 'declare', { by, text: 'hi', uid: 'u1' }), null);
@@ -419,4 +435,107 @@ test('reduce: non-string member names are rejected, not coerced', () => {
   for (const by of [5, true]) {
     assert.equal(reduce(declared, 'cheer', { by, target: 'alice' }), null);
   }
+});
+
+// Member names that collide with inherited `Object.prototype` properties
+// (`constructor`, `toString`, `hasOwnProperty`, `__proto__`) must be treated
+// as "no existing entry", not resolve to the inherited value. Before the
+// `Object.hasOwn` guards were added, these all threw a `TypeError` (e.g.
+// reading `.includes` off `Object.prototype.constructor` in `cheer`) —
+// this is a regression test for that crash. `target`/`by` are wire-controlled
+// values, so this was reachable from an untrusted client.
+test('reduce: prototype-inherited member names are treated as absent, not thrown on', () => {
+  const protoNames = ['constructor', 'toString', 'hasOwnProperty', '__proto__'];
+
+  for (const target of protoNames) {
+    assert.doesNotThrow(() => reduce(defaultState(), 'cheer', { by: 'bob', target }));
+    assert.equal(reduce(defaultState(), 'cheer', { by: 'bob', target }), null);
+  }
+
+  for (const by of protoNames) {
+    assert.doesNotThrow(() => reduce(defaultState(), 'declare', { by, text: 'hi', uid: 'u1' }));
+    const declared = reduce(defaultState(), 'declare', { by, text: 'hi', uid: 'u1' });
+    assert.ok(declared);
+    assert.equal(declared?.declarations[by]?.text, 'hi');
+
+    assert.doesNotThrow(() => reduce(defaultState(), 'join', { by, uid: 'u1' }));
+    const joined = reduce(defaultState(), 'join', { by, uid: 'u1' });
+    assert.ok(joined);
+    assert.deepEqual(joined?.participants[by], { uid: 'u1' });
+
+    assert.doesNotThrow(() => reduce(defaultState(), 'leave', { by }));
+    assert.equal(reduce(defaultState(), 'leave', { by }), null); // not participating → no-op
+  }
+});
+
+// --- uid normalization --------------------------------------------------
+
+test('declare/join: non-string uid is normalized to null, not cast through', () => {
+  const declared = reduce(defaultState(), 'declare', { by: 'alice', text: 'hi', uid: 42 });
+  assert.ok(declared);
+  assert.equal(declared?.declarations.alice.uid, null);
+
+  const joined = reduce(defaultState(), 'join', { by: 'alice', uid: 42 });
+  assert.ok(joined);
+  assert.equal(joined?.participants.alice.uid, null);
+});
+
+// --- pause clamp ----------------------------------------------------------
+
+test('pause: clamps remaining to 0 when endsAt is already in the past', () => {
+  const running: PomodoroState = { ...defaultState(), running: true, endsAt: NOW - 10_000 };
+  const next = withFrozenClock(NOW, () => reduce(running, 'pause'));
+  assert.ok(next);
+  assert.equal(next?.remaining, 0);
+});
+
+// --- timerDelay clamp -------------------------------------------------
+
+test('timerDelay: clamps to 0 when endsAt is already in the past', () => {
+  const running: PomodoroState = { ...defaultState(), running: true, endsAt: NOW - 5_000 };
+  const delay = withFrozenClock(NOW, () => timerDelay(running));
+  assert.equal(delay, 0);
+});
+
+// --- sanitizeDeclarations (via restore) --------------------------------
+
+test('restore: drops non-string cheer entries while keeping valid ones', () => {
+  const next = restore({
+    declarations: { alice: { text: 'ship it', uid: 'u1', cheers: ['x', 1, null] } },
+  });
+  assert.ok(next);
+  assert.deepEqual(next?.declarations.alice.cheers, ['x']);
+});
+
+// --- restore remaining clamp for the break phase -----------------------
+
+test('restore: remaining is clamped to the break length when phase is "break"', () => {
+  const next = restore({
+    phase: 'break',
+    remaining: 99_999,
+    config: { work: 1500, break: 300 },
+  });
+  assert.ok(next);
+  assert.equal(next?.remaining, 300);
+});
+
+// --- onTimer on a stopped state -----------------------------------------
+
+test('onTimer: applied to a stopped state keeps endsAt null', () => {
+  const s: PomodoroState = { ...defaultState(), running: false, phase: 'work' };
+  const next = withFrozenClock(NOW, () => onTimer(s));
+  assert.equal(next.phase, 'break');
+  assert.equal(next.endsAt, null);
+});
+
+// --- whitespace-only declaration text -----------------------------------
+
+test('declare: whitespace-only text clears an existing declaration', () => {
+  const s: PomodoroState = {
+    ...defaultState(),
+    declarations: { alice: { text: 'ship it', uid: 'u1', cheers: [] } },
+  };
+  const next = reduce(s, 'declare', { by: 'alice', text: '  ', uid: 'u1' });
+  assert.ok(next);
+  assert.equal('alice' in (next?.declarations ?? {}), false);
 });
