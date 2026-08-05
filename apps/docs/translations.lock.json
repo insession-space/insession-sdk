@@ -1,6 +1,7 @@
 {
   "//": "apps/docs/scripts/check-translation-sync.mjs が管理する。手で編集しない。日本語訳を英語 README に追随させたら `pnpm --filter @insession/docs run sync:accept` で更新する。",
   "packages": {
+    "chat-state": "d7d4fc9f3fae7408",
     "plugin-pomodoro-state": "b8fef83103c24920",
     "plugin-watch-party-state": "6e4fa640600f07f6",
     "plugin-whiteboard-state": "1194c71389de9c72",
