@@ -134,7 +134,14 @@ export interface WatchPartyPayload {
   /** `queue-add`: the adding member's display name/uid. */
   addedBy?: unknown;
   addedByUid?: unknown;
-  /** `queue-remove`/`queue-reorder`/`queue-play`: the target queue item's `uid`. */
+  /**
+   * `queue-remove`/`queue-reorder`/`queue-play`: the target queue item's `uid`.
+   *
+   * `queue-add` also accepts it, as the id to give the new item. Supply one if
+   * you persist the queue under your own ids (a database primary key); omit it
+   * and `reduce` mints a counter-based id, which only stays unique for a host
+   * that never reloads the queue from storage.
+   */
   uid?: unknown;
   /** `queue-reorder`: the destination index. */
   toIndex?: unknown;
@@ -844,7 +851,13 @@ export function createWatchParty(options: CreateWatchPartyOptions = {}): WatchPa
         }
         const queueSeq = s.queueSeq + 1;
         const item: WatchPartyQueueItem = {
-          uid: `q${queueSeq}`,
+          // A host that persists its queue almost certainly has its own id for
+          // each row — a database primary key it later uses to delete or
+          // reorder. Let it supply that id so the two never drift apart.
+          // The built-in counter is only safe for a host that keeps the whole
+          // queue in memory: it restarts from zero on reload, so persisted
+          // rows from an earlier run would collide with freshly minted ids.
+          uid: str(payload?.uid, MAX_UID_LEN) || `q${queueSeq}`,
           videoId,
           provider,
           mediaUrl,
