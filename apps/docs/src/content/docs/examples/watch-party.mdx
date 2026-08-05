@@ -1,0 +1,94 @@
+---
+title: 'Watch Party'
+description: A live demo of @insession/plugin-watch-party-state — synchronized playback, a queue, and metadata resolution, with every call and the effects it returned shown next to them.
+---
+
+import WatchPartyDemo from '../../../components/examples/WatchPartyDemo.tsx';
+
+Unlike the other state machines on this site, this one has real I/O worth
+doing: broadcasting to a room, persisting playback, fetching a video's title.
+Instead of taking `broadcast`/`persist`/`fetchTitle` callbacks and calling
+them internally, `reduce` stays a pure function and returns them as data —
+`{ state, effects }`, a list of typed `WatchPartyEffect` descriptors your
+host interprets and executes. This is the same convention
+`@insession/space-state`'s `reduceSpace` uses: the reducer describes *what*
+should happen, the host decides *how*. `reduce` itself never touches a
+network, a database, or a WebSocket.
+
+<WatchPartyDemo client:only="react" />
+
+## What to try
+
+- Every button click adds a row to **Calls** on the right, and each row's
+  effects line lists exactly what the package asked the host to do —
+  `broadcast`, `send-to-sender`, `persist-playback`, `persist-media`, or
+  `resolve-metadata` — for that one call.
+- Press **load-video**. Its title is unknown, so alongside the `broadcast`
+  and `persist-*` effects you'll see a `resolve-metadata` effect asking the
+  host to go look up a title. This package has no HTTP client and can't do
+  that itself.
+- Press **queue-add** for either video. It lands in the queue with
+  `(未解決 — resolve-metadata 待ち)` in place of a title. Press the
+  **ホストがメタデータを解決** ("host resolves metadata") button that appears
+  next to it — that calls `reduce(state, 'resolve-metadata', { uid, kind:
+  'queue', title, durationSec })` directly, simulating the host's side of the
+  round trip, and the title fills in.
+- Press **play**, then watch the clock. `state` doesn't change again on its
+  own — the seconds you see come from `currentPosition(state)` extrapolating
+  from the last recorded position and timestamp, redrawn every tick on the
+  client. Only an actual `play`/`pause`/`seek`/`load-video` action changes
+  `state`.
+- With **queue-add** capped at `maxPerUser: 1` in this demo, add a video as
+  Alice, then add a second one still as Alice. The second call's only effect
+  is `send-to-sender` carrying `{ type: 'queue-rejected', reason:
+  'max-per-user', limit: 1 }` — the rejection is visible to the member who
+  tried, not broadcast to the room. Switch to **as Bob** and it succeeds
+  again, since the cap is per member.
+- Press **pause**. The call returns `null` — no state change, no effects.
+  This is deliberate: pausing affects only the client that pressed it, not
+  the shared room state, so `reduce` has nothing to do.
+
+## The code behind it
+
+A host loop over `result.effects` is what actually makes anything happen:
+
+```ts
+const out = watchParty.reduce(state, action, payload);
+if (!out) return; // invalid or a no-op
+state = out.state;
+for (const effect of out.effects) {
+  switch (effect.type) {
+    case 'broadcast':
+      broadcastToRoom(effect.message, { excludeSender: effect.excludeSender });
+      break;
+    case 'send-to-sender':
+      sendToSender(effect.message);
+      break;
+    case 'persist-playback':
+      db.savePlaybackState(roomId, effect.videoId, effect.isPlaying, effect.position);
+      break;
+    case 'persist-media':
+      db.saveMedia(roomId, effect.provider, effect.mediaUrl, effect.thumbnail);
+      break;
+    case 'resolve-metadata':
+      // Fetch a title/duration however you like, then feed it back in:
+      resolveTitleAndDuration(effect).then(({ title, durationSec }) => {
+        const patched = watchParty.reduce(state, 'resolve-metadata', {
+          uid: effect.uid,
+          kind: effect.kind,
+          title,
+          durationSec,
+        });
+        if (patched) state = patched.state;
+      });
+      break;
+  }
+}
+```
+
+`reduce` never performs I/O itself — the only "impure" thing anywhere in the
+package is `Date.now()`. That's what lets the exact same state machine run
+on a server, in a test, or in this page: only the effect loop differs.
+
+See the [package reference](/packages/plugin-watch-party-state/) for the
+full action list, effect shapes, and the shuffle/mix injection points.

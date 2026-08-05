@@ -62,6 +62,7 @@ export default defineConfig({
           items: [
             { label: 'pomodoro', slug: 'examples/pomodoro' },
             { label: 'whiteboard', slug: 'examples/whiteboard' },
+            { label: 'watch-party', slug: 'examples/watch-party' },
             { label: 'space-state', slug: 'examples/space-state' },
             { label: 'space-state-react', slug: 'examples/space-state-react' },
           ],

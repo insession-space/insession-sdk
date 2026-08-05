@@ -32,6 +32,9 @@ importers:
       '@insession/plugin-pomodoro-state':
         specifier: workspace:*
         version: link:../../packages/plugin-pomodoro-state
+      '@insession/plugin-watch-party-state':
+        specifier: workspace:*
+        version: link:../../packages/plugin-watch-party-state
       '@insession/plugin-whiteboard-state':
         specifier: workspace:*
         version: link:../../packages/plugin-whiteboard-state
