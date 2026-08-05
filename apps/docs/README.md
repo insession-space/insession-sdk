@@ -78,6 +78,36 @@ pnpm --filter @insession/docs run sync:accept
 - sidebar のラベルは `astro.config.mjs` の `translations: { ja: '…' }` で訳す
 - **コード例・API 名・オプション名は訳さない**。訳すと英語版と突き合わせられなくなる
 
+## デモページ（`/examples/*`）
+
+各パッケージを**ブラウザ上で実際に動かす**ページ。英語 `src/content/docs/examples/`・日本語
+`src/content/docs/ja/examples/` のどちらも**手書き**（`packages/*` と違って生成物ではない）。
+デモ本体は `src/components/examples/*.tsx` の React コンポーネントで、**英日で同じものを共有**
+している（説明文だけ訳し、ボタン等の UI ラベルは英語のまま）。
+
+- **デモはパッケージの実装を実際に import する。** 挙動を再実装しないこと — デモが独自の状態機械を
+  持つと、パッケージを直したときにデモだけ静かに古くなる
+- ページに載せるときは `client:only="react"` を使う。`client:load` だと SSR 時に
+  `useSpaceState`（`getServerSnapshot` を渡さない `useSyncExternalStore`）が落ちる
+- パッケージを足してデモを作ったら、`astro.config.mjs` の `sidebar` の Examples にも項目を足すこと
+
+### ⚠ デモは依存パッケージの `dist` を要求する
+
+デモが `@insession/*` を実 import するので、Astro を動かす前に依存パッケージがビルド済みで
+なければならない。`dev` / `build` / `typecheck` の前に `build:deps`（`pnpm --filter
+"@insession/docs^..." run build`）を挟んであるのはそのため。
+
+**特に CI は `pnpm verify`（`typecheck` を含む）を `pnpm build` より先に回す。** これが無いと
+`astro check` が `dist` を解決できずに落ちる。
+
+### ⚠ `@astrojs/react` は 4 系に留めること
+
+Astro 5（Vite 6）に対して 6 系を入れると、`pnpm dev` でハイドレーションが落ちる
+（`builtin:vite-react-refresh-wrapper` の `Missing field 'moduleType'` — 6 系は Vite 7 / rolldown
+前提）。**厄介なのは `pnpm build` が通り続けること**で、dev だけが壊れるため気づきにくい。
+`pnpm add @astrojs/react` を無指定で打つと最新（6 系）が入るので、上げるときは Astro 本体の
+メジャーと合っているかを先に確かめること。
+
 ## ⚠ 色は design-system の「値」をコピーしている（依存はしていない）
 
 `src/styles/tokens.css` が `@insession/design-system` のトークンを写経して Starlight の

@@ -1,6 +1,7 @@
 {
   "//": "apps/docs/scripts/check-translation-sync.mjs が管理する。手で編集しない。日本語訳を英語 README に追随させたら `pnpm --filter @insession/docs run sync:accept` で更新する。",
   "packages": {
+    "plugin-pomodoro-state": "b8fef83103c24920",
     "space-state": "7b8037d6aa405272",
     "space-state-react": "2b35a8b512b01f16",
     "ws-resilient-transport": "57f6d98a9ea79e45"

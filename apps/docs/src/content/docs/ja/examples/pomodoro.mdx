@@ -1,0 +1,49 @@
+---
+title: 'ポモドーロタイマー'
+description: '@insession/plugin-pomodoro-state の実動作デモ。状態機械を叩いてフェーズ遷移を見ながら、その裏で呼ばれたコードを並べて確認できます。'
+---
+
+import PomodoroDemo from '../../../../components/examples/PomodoroDemo.tsx';
+
+このパッケージの要点は、**動作中のタイマーが秒を持たない**ことです。動作中の state が持つのは
+`endsAt`（壁時計の epoch ミリ秒）だけで、カウントダウンはクライアントがそこから描きます。
+だから下の時計は毎秒動くのに、`state` はあなたが何かを押したときと、フェーズが実際に切れた
+ときにしか変わりません。
+
+<PomodoroDemo client:only="react" />
+
+## 試してみること
+
+- **start** を押し、もう一度 **start** を押す。2回目は `null` が返ります — `reduce` は動作中の
+  タイマーに対する start を、例外でも再スタートでもなく no-op として扱います。
+- **pause** を押して、`endsAt` が `null` になり `remaining` が残り秒で凍結するのを見る。
+- **skip** を何回か押す。フェーズは交互に変わるのに `cycles` は増えません — 完了サイクルとして
+  数えるのは、自然に時間切れになったフェーズだけです。
+- **work** に `0` を入れて送る。現在の config にフォールバックせず1分にクランプされます。`0` は
+  「数値に変換できる値」だからです。`999` も試すと 120 にクランプされます。
+- 動作中に **configure** を送る。`null` が返ります — フェーズの途中で長さを変える意味が曖昧なので、
+  停止中しか受け付けません。
+
+## 裏で動いているコード
+
+デモが import しているのは、公開されているパッケージだけです:
+
+```ts
+import { defaultState, onTimer, reduce, timerDelay } from '@insession/plugin-pomodoro-state';
+
+let state = defaultState();
+
+// ボタンが押されたとき
+const next = reduce(state, 'start');
+if (next) state = next;
+
+// フェーズ遷移は自分のタイマーで駆動する
+const delay = timerDelay(state); // フェーズが終わるまでのミリ秒、動作中でなければ null
+if (delay !== null) setTimeout(() => { state = onTimer(state); }, delay);
+```
+
+`reduce` は純関数です — I/O をせず、内部でタイマーも張りません。スケジューリングが呼ぶ側の責務で
+あることが、同じ状態機械をサーバーでも、テストでも、このページでも動かせる理由です。
+
+アクションの全一覧と永続化のヘルパー（`restore` / `persistState`）は
+[パッケージのリファレンス](/ja/packages/plugin-pomodoro-state/)を参照してください。

@@ -1,4 +1,5 @@
 // @ts-check
+import react from '@astrojs/react';
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
 
@@ -29,7 +30,7 @@ export default defineConfig({
       social: [{ icon: 'github', label: 'GitHub', href: REPO }],
       // ⚠ トークンは @insession/design-system の値を**コピーしている**（依存はしていない）。
       // 理由と同期の手引きは src/styles/tokens.css の先頭コメントを参照。
-      customCss: ['./src/styles/tokens.css'],
+      customCss: ['./src/styles/tokens.css', './src/styles/examples.css'],
       editLink: { baseUrl: `${REPO}/edit/main/apps/docs/` },
       sidebar: [
         {
@@ -53,7 +54,19 @@ export default defineConfig({
             { label: 'plugin-pomodoro-state', slug: 'packages/plugin-pomodoro-state' },
           ],
         },
+        {
+          label: 'Examples',
+          translations: { ja: 'デモ' },
+          items: [
+            { label: 'pomodoro', slug: 'examples/pomodoro' },
+            { label: 'space-state', slug: 'examples/space-state' },
+            { label: 'space-state-react', slug: 'examples/space-state-react' },
+          ],
+        },
       ],
     }),
+    // デモページ(/examples/*)を動かすためだけの統合。ページ本体は MDX のままで、
+    // デモのコンポーネントだけを island として載せる。
+    react(),
   ],
 });
