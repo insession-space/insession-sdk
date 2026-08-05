@@ -1,5 +1,12 @@
 # @insession/docs
 
+## 0.0.5
+
+### Patch Changes
+
+- Updated dependencies [64444c6]
+  - @insession/plugin-watch-party-state@0.3.0
+
 ## 0.0.4
 
 ### Patch Changes

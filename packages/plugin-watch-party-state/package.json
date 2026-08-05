@@ -1,6 +1,6 @@
 {
   "name": "@insession/plugin-watch-party-state",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A dependency-free, framework-agnostic Watch Party state machine: server-authoritative synchronized video/audio playback with a queue and history. reduce() is a pure function that returns the next state plus effect descriptors for the host to execute.",
   "//": "このパッケージは insession-app の plugin-youtube(Watch Party) の server 面(純粋関数のみ)を切り出したもので、UI・i18n・design-system への依存を持たないため SDK に置ける。外部依存はランダム再生の選択ロジック pickShuffleIndex だけで、これは @in-session/protocol がマイルームとも共有する単一ソースのため SDK に複製せず createWatchParty の pickShuffleIndex 引数として注入する形に解いてある（plugin-whiteboard-state の isOwnImageUrl と同じ注入パターン）。UI 側(plugin-watch-party)は insession-app に残る。",
   "//exports": "ESM に加えて CJS も出しているのは、消費者である insession-app のサーバーが .ts を直接実行しており require() で読むため。ESM only にすると require が壊れる(plugin-pomodoro-state / plugin-whiteboard-state と同じ理由)。",
