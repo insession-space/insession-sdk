@@ -4,7 +4,7 @@ description: Zero-dependency building blocks for realtime shared rooms — a res
 template: splash
 hero:
   title: Realtime rooms, without the plumbing
-  tagline: Five small, zero-dependency packages pulled out of a production realtime app — a WebSocket transport that survives deploys, and state stores you can test without a server.
+  tagline: Six small, zero-dependency packages pulled out of a production realtime app — a WebSocket transport that survives deploys, and state stores you can test without a server.
   actions:
     - text: Get started
       link: /getting-started/
@@ -105,13 +105,30 @@ hero:
       <a href="https://www.npmjs.com/package/@insession/plugin-whiteboard-state">npm</a>
     </div>
   </div>
+
+  <div class="pkg-card">
+    <h3>@insession/plugin-watch-party-state</h3>
+    <p>
+      A server-authoritative Watch Party state machine: synchronized video/audio playback with a
+      queue and history. <code>reduce</code> returns effect descriptors instead of performing
+      I/O, so a host wires up broadcast/persist/title-lookup itself.
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">0 dependencies</span>
+      <span class="pkg-tag">pure reducer</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/packages/plugin-watch-party-state/">Docs</a>
+      <a href="https://www.npmjs.com/package/@insession/plugin-watch-party-state">npm</a>
+    </div>
+  </div>
 </div>
 
 <p class="dep-note">
   Only one edge between them: <code>space-state-react</code> → <code>space-state</code>.
-  <code>ws-resilient-transport</code>, <code>plugin-pomodoro-state</code>, and
-  <code>plugin-whiteboard-state</code> are independent — carrying bytes and holding state are
-  kept apart on purpose, so you can adopt either one alone.
+  <code>ws-resilient-transport</code>, <code>plugin-pomodoro-state</code>,
+  <code>plugin-whiteboard-state</code>, and <code>plugin-watch-party-state</code> are independent
+  — carrying bytes and holding state are kept apart on purpose, so you can adopt any one alone.
 </p>
 
 ## Why these

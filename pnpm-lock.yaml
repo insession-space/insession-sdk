@@ -32,6 +32,9 @@ importers:
       '@insession/plugin-pomodoro-state':
         specifier: workspace:*
         version: link:../../packages/plugin-pomodoro-state
+      '@insession/plugin-watch-party-state':
+        specifier: workspace:*
+        version: link:../../packages/plugin-watch-party-state
       '@insession/plugin-whiteboard-state':
         specifier: workspace:*
         version: link:../../packages/plugin-whiteboard-state
@@ -68,6 +71,15 @@ importers:
         version: 5.9.3
 
   packages/plugin-pomodoro-state:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.5
+        version: 8.5.1(postcss@8.5.25)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/plugin-watch-party-state:
     devDependencies:
       tsup:
         specifier: ^8.3.5

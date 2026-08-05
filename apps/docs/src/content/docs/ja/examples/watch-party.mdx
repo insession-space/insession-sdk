@@ -1,0 +1,93 @@
+---
+title: 'ウォッチパーティー'
+description: '@insession/plugin-watch-party-state の実動作デモ。同期再生・キュー・メタデータ解決を、その裏で呼ばれたコードと返ってきた effects を並べて確認できます。'
+---
+
+import WatchPartyDemo from '../../../../components/examples/WatchPartyDemo.tsx';
+
+このサイトの他の状態機械と違い、このパッケージは本物の副作用（ルームへの
+broadcast・再生位置の永続化・動画タイトルの取得）を扱う価値があります。
+`broadcast`/`persist`/`fetchTitle` のようなコールバックを受け取って内部で
+呼び出す代わりに、`reduce` は純関数のまま、それらをデータとして返します —
+`{ state, effects }`、host が解釈して実行する `WatchPartyEffect` の型付き記述子の
+配列です。これは `@insession/space-state` の `reduceSpace` が使っているのと
+同じ規約です: reducer は「何が起きるべきか」を記述し、host が「どうやるか」を
+決めます。`reduce` 自体はネットワークにも DB にも WebSocket にも一切触れません。
+
+<WatchPartyDemo client:only="react" />
+
+## 試してみること
+
+- ボタンを押すたびに右側の **Calls** に行が積まれ、その effects 行にはその
+  1回の呼び出しでパッケージが host に依頼した内容 — `broadcast` /
+  `send-to-sender` / `persist-playback` / `persist-media` / `resolve-metadata`
+  — がそのまま並びます。
+- **load-video** を押す。タイトルが未知なので、`broadcast` や `persist-*` と
+  並んで `resolve-metadata` effect が出ます — host にタイトルを調べてきて
+  ほしいという依頼です。このパッケージには HTTP クライアントが無く、自分では
+  それができません。
+- どちらかの動画で **queue-add** を押す。タイトルの代わりに
+  `(未解決 — resolve-metadata 待ち)` と表示された状態でキューに積まれます。
+  その横に出る **ホストがメタデータを解決** ボタンを押すと、
+  `reduce(state, 'resolve-metadata', { uid, kind: 'queue', title,
+  durationSec })` を直接呼び出して host 側の往復をシミュレートし、タイトルが
+  埋まります。
+- **play** を押してから、時計だけを眺める。`state` はそれ以降ひとりでには
+  変わりません — 見えている秒数は `currentPosition(state)` が直近の位置と
+  タイムスタンプから外挿し、クライアント側で毎ティック描き直しているだけです。
+  実際に `play`/`pause`/`seek`/`load-video` を呼んだときだけ `state` が変わります。
+- このデモでは **queue-add** に `maxPerUser: 1` の上限を効かせています。
+  Alice として1本追加し、続けて Alice のまま2本目を追加してみる。2回目の
+  呼び出しの effects は `send-to-sender` の
+  `{ type: 'queue-rejected', reason: 'max-per-user', limit: 1 }` だけです —
+  拒否は試みた本人にだけ見え、ルーム全体には broadcast されません。
+  **as Bob** に切り替えれば再び成功します。上限がメンバーごとだからです。
+- **pause** を押す。呼び出しは `null` を返します — state も変わらず、
+  effects も出ません。これは意図的な設計です: 一時停止は押した本人の
+  クライアントにしか影響しないため、共有ルーム state に対して `reduce` が
+  することは何もありません。
+
+## 裏で動いているコード
+
+`result.effects` を host 側でループして初めて何かが実際に起きます:
+
+```ts
+const out = watchParty.reduce(state, action, payload);
+if (!out) return; // invalid or a no-op
+state = out.state;
+for (const effect of out.effects) {
+  switch (effect.type) {
+    case 'broadcast':
+      broadcastToRoom(effect.message, { excludeSender: effect.excludeSender });
+      break;
+    case 'send-to-sender':
+      sendToSender(effect.message);
+      break;
+    case 'persist-playback':
+      db.savePlaybackState(roomId, effect.videoId, effect.isPlaying, effect.position);
+      break;
+    case 'persist-media':
+      db.saveMedia(roomId, effect.provider, effect.mediaUrl, effect.thumbnail);
+      break;
+    case 'resolve-metadata':
+      // 好きな方法でタイトル/尺を取得し、結果を送り返す:
+      resolveTitleAndDuration(effect).then(({ title, durationSec }) => {
+        const patched = watchParty.reduce(state, 'resolve-metadata', {
+          uid: effect.uid,
+          kind: effect.kind,
+          title,
+          durationSec,
+        });
+        if (patched) state = patched.state;
+      });
+      break;
+  }
+}
+```
+
+`reduce` は自分では一切 I/O をしません — パッケージ全体で唯一「純粋でない」
+ものは `Date.now()` だけです。だからこそ、同じ状態機械をサーバーでも、
+テストでも、このページでも動かせます。違うのは effect ループだけです。
+
+アクションの全一覧・effect の型・shuffle/mix の注入ポイントは
+[パッケージのリファレンス](/ja/packages/plugin-watch-party-state/)を参照してください。

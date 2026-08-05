@@ -53,6 +53,7 @@ export default defineConfig({
             { label: 'space-state-react', slug: 'packages/space-state-react' },
             { label: 'plugin-pomodoro-state', slug: 'packages/plugin-pomodoro-state' },
             { label: 'plugin-whiteboard-state', slug: 'packages/plugin-whiteboard-state' },
+            { label: 'plugin-watch-party-state', slug: 'packages/plugin-watch-party-state' },
           ],
         },
         {
@@ -61,6 +62,7 @@ export default defineConfig({
           items: [
             { label: 'pomodoro', slug: 'examples/pomodoro' },
             { label: 'whiteboard', slug: 'examples/whiteboard' },
+            { label: 'watch-party', slug: 'examples/watch-party' },
             { label: 'space-state', slug: 'examples/space-state' },
             { label: 'space-state-react', slug: 'examples/space-state-react' },
           ],
