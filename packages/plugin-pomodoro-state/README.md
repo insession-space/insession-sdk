@@ -1,4 +1,4 @@
-# @insession/pomodoro-state
+# @insession/plugin-pomodoro-state
 
 A **dependency-free, server-authoritative Pomodoro timer state machine.**
 
@@ -32,7 +32,7 @@ This package is that state machine, with none of the plumbing:
 ## Install
 
 ```sh
-npm install @insession/pomodoro-state
+npm install @insession/plugin-pomodoro-state
 ```
 
 Published as a built package with both ESM (`dist/index.js`) and CommonJS
@@ -50,7 +50,7 @@ import {
   restore,
   timerDelay,
   type PomodoroState,
-} from '@insession/pomodoro-state';
+} from '@insession/plugin-pomodoro-state';
 
 // Somewhere you keep one PomodoroState per room, e.g. a Map<roomId, PomodoroState>.
 let state: PomodoroState = defaultState();
@@ -61,7 +61,7 @@ function onClientAction(action: string, payload: unknown) {
   const next = reduce(state, action, payload as Record<string, unknown>);
   if (!next) return; // invalid or a no-op — nothing changed, nothing to broadcast
   state = next;
-  broadcastToRoom({ type: 'pomodoro-state', state });
+  broadcastToRoom({ type: 'plugin-pomodoro-state', state });
   schedulePhaseTimer();
 }
 
@@ -73,7 +73,7 @@ function schedulePhaseTimer() {
   if (delay === null) return; // not running — nothing to schedule
   phaseTimer = setTimeout(() => {
     state = onTimer(state);
-    broadcastToRoom({ type: 'pomodoro-state', state });
+    broadcastToRoom({ type: 'plugin-pomodoro-state', state });
     schedulePhaseTimer();
   }, delay);
 }

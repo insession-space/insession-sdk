@@ -40,7 +40,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/pomodoro-state:
+  packages/plugin-pomodoro-state:
     devDependencies:
       tsup:
         specifier: ^8.3.5

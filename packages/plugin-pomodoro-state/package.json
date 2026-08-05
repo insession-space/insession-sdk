@@ -1,5 +1,5 @@
 {
-  "name": "@insession/pomodoro-state",
+  "name": "@insession/plugin-pomodoro-state",
   "version": "0.0.0",
   "description": "A dependency-free, framework-agnostic Pomodoro timer state machine. The server holds the authoritative state; reduce() is a pure function.",
   "//": "このパッケージは insession-app の plugin-pomodoro の server 面(純粋関数のみ)を切り出したもので、UI・i18n・design-system への依存を持たないため SDK に置ける。UI 側(pomodoro-kit)と plugin 本体は insession-app に残る。",
@@ -16,7 +16,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/insession-space/insession-sdk.git",
-    "directory": "packages/pomodoro-state"
+    "directory": "packages/plugin-pomodoro-state"
   },
   "exports": {
     ".": {
