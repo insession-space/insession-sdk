@@ -1,0 +1,82 @@
+---
+title: 'The whole space'
+description: Every @insession package running together in one room — two members, four state machines, and a page playing the server, with no network involved.
+---
+
+import SpaceDemo from '../../../components/examples/SpaceDemo.tsx';
+
+The other demos each open up one package. This one puts them all in the same
+room so you can see the part no single package shows: **where the boundaries
+are**.
+
+Two members share one space. A pomodoro timer, a whiteboard, a watch party and
+a chat log all live in it. The page below plays the **server** — it owns every
+state machine, runs every effect descriptor, and decides who each message goes
+to. The clients are two `createSpaceStore` instances subscribed through
+`useSpaceState`. Nothing leaves the browser tab.
+
+<SpaceDemo client:only="react" />
+
+## The four boundaries this demo draws
+
+**Plugins arrive as `app-state`.** The pomodoro and whiteboard machines run on
+the server; their new state is broadcast as `{ type: 'app-state', appId, state }`
+and the core stores it under `apps[appId]` — that part happens whether or not a
+plugin descriptor exists. Anything *specific* to a plugin (a log line when the
+phase flips, a sound to play) comes from a `definePluginClient` descriptor
+handed to `createSpaceStore`. The core never learns the plugin's name, its
+wording, or its sound; it just calls `onAppState` and passes along whatever
+comes back.
+
+**Chat is core, not a plugin.** `@insession/chat-state` runs on the server and
+its `broadcast` / `send-to-sender` messages land directly on the receive cases
+`@insession/space-state` already has. Press **send text** and watch the trace:
+the sender is excluded from the broadcast and gets a `chat-ack` instead, which
+carries the id their optimistic local line was missing. Two packages, written
+separately, meeting exactly at `clientMsgId`.
+
+**The player sits outside the core.** `@insession/plugin-watch-party-state`
+broadcasts `play`, `seek` and `queue-update` — and `space-state` has no case for
+any of them, on purpose. The player is a separate channel of the room, so the
+page projects those messages into its own view, exactly as a real player
+component would. A package doesn't have to fit through `app-state` to belong in
+a space.
+
+**Everything round-trips.** Even the stage tabs. Clicking one calls
+`store.stage.change(...)`, which sends `stage-change` to the server and only
+moves once `member-updated` comes back. That's why the member rail shows what
+everyone is looking at without any extra bookkeeping.
+
+## What to try
+
+- **Press start on the pomodoro, then switch to `as Bob`.** The timer reads the
+  same, because it was never client state — it's `apps.pomodoro`, delivered to
+  both stores by the same broadcast.
+- **Send a message as Alice, then look at both members in the rail.**
+  `chatLines` matches on both clients, but the *lines* differ: Alice has her own
+  optimistic echo reconciled by `chat-ack`, Bob received the broadcast.
+- **Send a sticker and read the trace.** The host resolves its own allowlist
+  first and folds the answer into `stickerAllowed`, so the package never sees a
+  URL policy — it only ever sees a boolean the host already decided. What
+  happens when that boolean is `false` is easier to read on
+  [chat](/examples/chat), where a caption can ride along with the image.
+- **Queue two videos as the same member.** The second is refused with
+  `maxPerUser: 1`, and the refusal is a `send-to-sender` — the other member sees
+  nothing at all.
+- **Queue anything and watch the title.** It lands as `(未解決)` and the package
+  emits a `resolve-metadata` descriptor; the host answers it, and the resolved
+  title arrives on the next broadcast. The package never fetches anything
+  itself.
+- **Press clear on the whiteboard after drawing.** One log line appears in
+  chat — that's the whiteboard's own `PluginClient`, not the core, deciding that
+  clearing is worth mentioning.
+- **Press typing, then wait.** The store emits a `typing-timer` *descriptor*;
+  the page is what actually calls `setTimeout`. Nothing in the packages touches
+  a timer, a speaker, or a notification.
+
+## What is not here
+
+Only the pieces that need a real space are on this page. The relay drawing game
+lives on [whiteboard](/examples/whiteboard), reconnection behaviour belongs to
+`@insession/ws-resilient-transport`, and each package's full surface is on its
+own example page. The point here is the seams, not the coverage.
