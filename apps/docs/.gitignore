@@ -1,0 +1,6 @@
+dist/
+.astro/
+
+# packages/*/README.md から生成するパッケージページ（scripts/sync-package-docs.mjs）。
+# 直すときは README を直す。ここを直しても次のビルドで消える。
+src/content/docs/packages/

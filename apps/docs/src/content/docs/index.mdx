@@ -1,0 +1,109 @@
+---
+title: '@insession SDK'
+description: Zero-dependency building blocks for realtime shared rooms — a resilient WebSocket transport and a transport-agnostic state store, extracted from InSession.
+template: splash
+hero:
+  title: Realtime rooms, without the plumbing
+  tagline: Three small, zero-dependency packages pulled out of a production realtime app — a WebSocket transport that survives deploys, and a state store you can test without a server.
+  actions:
+    - text: Get started
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/insession-space/insession-sdk
+      icon: external
+      variant: minimal
+---
+
+<div class="install-line">
+  <span class="prompt">$</span>
+  <span>npm install @insession/space-state @insession/ws-resilient-transport</span>
+</div>
+
+## The packages
+
+<div class="pkg-grid">
+  <div class="pkg-card">
+    <h3>@insession/ws-resilient-transport</h3>
+    <p>
+      A WebSocket transport that reconnects the way a deploy actually needs it to: fast on a
+      service restart, jittered exponential backoff otherwise, and a full stop on terminal
+      close codes.
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">0 dependencies</span>
+      <span class="pkg-tag">~130 LOC</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/packages/ws-resilient-transport/">Docs</a>
+      <a href="https://www.npmjs.com/package/@insession/ws-resilient-transport">npm</a>
+    </div>
+  </div>
+
+  <div class="pkg-card">
+    <h3>@insession/space-state</h3>
+    <p>
+      A state store for shared rooms — members, chat, presence, plugins. Inbound messages fold
+      through a pure reducer; side effects come back as descriptors instead of firing.
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">0 dependencies</span>
+      <span class="pkg-tag">pure reducer</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/packages/space-state/">Docs</a>
+      <a href="https://www.npmjs.com/package/@insession/space-state">npm</a>
+    </div>
+  </div>
+
+  <div class="pkg-card">
+    <h3>@insession/space-state-react</h3>
+    <p>
+      The React binding for <code>space-state</code>: one hook over
+      <code>useSyncExternalStore</code>, about ten lines, no logic of its own.
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag">1 hook</span>
+      <span class="pkg-tag">react peer</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/packages/space-state-react/">Docs</a>
+      <a href="https://www.npmjs.com/package/@insession/space-state-react">npm</a>
+    </div>
+  </div>
+</div>
+
+<p class="dep-note">
+  Only one edge between them: <code>space-state-react</code> → <code>space-state</code>.
+  <code>ws-resilient-transport</code> is independent — carrying bytes and holding state are
+  kept apart on purpose, so you can adopt either one alone.
+</p>
+
+## Why these
+
+<div class="selling-grid">
+  <div>
+    <h3>Nothing to install underneath</h3>
+    <p>
+      The transport and the store have zero runtime dependencies. No framework, no socket
+      library, no DOM. That is the point of them, not an accident.
+    </p>
+  </div>
+  <div>
+    <h3>Testable without a server</h3>
+    <p>
+      The store takes plain objects in and hands plain descriptors back, so a full state
+      transition is assertable in-process under <code>node --test</code> — no browser, no
+      sockets, no wall-clock waits.
+    </p>
+  </div>
+  <div>
+    <h3>Shaped by real deploys</h3>
+    <p>
+      The reconnect behaviour exists because every client drops at the same instant on every
+      deploy. Fast path on service restart, jitter so the fleet does not stampede, and a hard
+      stop when the server says never again.
+    </p>
+  </div>
+</div>

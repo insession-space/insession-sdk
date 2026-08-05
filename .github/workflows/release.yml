@@ -47,8 +47,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # publish されるのは dist なので、publish 前に必ず作り直す。
+      # ⚠ ルートの `pnpm build` ではなく packages/ に絞る。apps/docs（ドキュメントサイト）が
+      # workspace に加わったため、`pnpm build` は docs のビルドまで含むようになった。
+      # publish に要らないビルドを publish 経路に置くと、**サイト側の失敗で npm publish が
+      # 止まる**（docs は Cloudflare Pages が別途ビルドするので、ここで作る意味も無い）。
+      # docs のビルド検証は CI(ci.yml の `pnpm build`)側で行う。
       - name: Build dist
-        run: pnpm build
+        run: pnpm --filter "./packages/*" run build
 
       - name: Create Version PR or publish
         uses: changesets/action@v1

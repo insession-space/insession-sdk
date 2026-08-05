@@ -1,2 +1,5 @@
 packages:
+  # publish 対象の npm パッケージ。
   - packages/*
+  # publish しない社内アプリ（ドキュメントサイト兼 LP）。
+  - apps/*

@@ -1,0 +1,29 @@
+{
+  "name": "@insession/docs",
+  "version": "0.0.0",
+  "description": "@insession/* SDK の外部向けドキュメントサイト兼 LP（Astro + Starlight。npm には publish しない）",
+  "//": "private: true。これは配布物ではなく Cloudflare Pages へデプロイする静的サイトなので、Changesets の採番対象からも npm publish の対象からも外す。",
+  "private": true,
+  "type": "module",
+  "//sync": "パッケージページは packages/*/README.md から生成する（単一ソース）。dev/build/typecheck のいずれでも先に走らせないと、生成物が無い状態で Astro が動いて sidebar のリンク切れになる。",
+  "//typecheck": "astro check をこの名前で持つのは意図的。ルートの `pnpm typecheck`(= pnpm -r run typecheck)が自動で拾い、CI の単一ソースである `pnpm verify` に何も足さずに含まれるため。",
+  "scripts": {
+    "sync": "node scripts/sync-package-docs.mjs",
+    "predev": "pnpm sync",
+    "dev": "astro dev",
+    "prebuild": "pnpm sync",
+    "build": "astro build",
+    "preview": "astro preview",
+    "pretypecheck": "pnpm sync",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.36.0",
+    "astro": "^5.14.0",
+    "sharp": "^0.34.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "typescript": "^5.7.0"
+  }
+}
