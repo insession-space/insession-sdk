@@ -103,13 +103,19 @@ test('load-video: known title skips the resolve-metadata effect', () => {
 });
 
 test('load-video: soundcloud without a mediaUrl is rejected', () => {
-  const out = wp.reduce(defaultState(), 'load-video', {
+  // ⚠ `defaultState()` stamps `lastUpdate: Date.now()`, so it must be built once
+  // and compared against itself. Calling it a second time inside the assertion
+  // makes this test fail whenever a millisecond ticks in between — rare locally,
+  // routine on a slow CI runner. Reusing the instance also states the intent
+  // more precisely: the state is *unchanged*, not merely default-shaped.
+  const initial = defaultState();
+  const out = wp.reduce(initial, 'load-video', {
     provider: 'soundcloud',
     videoId: 'sc-track-abc',
   });
   // Rejected, but not silently: nothing enters state and the sender is told why.
   assert.ok(out);
-  assert.deepEqual(out.state, defaultState());
+  assert.deepEqual(out.state, initial);
   assert.deepEqual(out.effects, [
     { type: 'send-to-sender', message: { type: 'queue-rejected', reason: 'invalid-media-url' } },
   ]);
@@ -791,12 +797,15 @@ test('does not depend on Node-only globals (browser-safe)', () => {
 // the source this was ported from does report it.
 test('load-video: rejecting a SoundCloud item without a media URL notifies the sender', () => {
   const wp = createWatchParty();
-  const out = wp.reduce(wp.defaultState(), 'load-video', {
+  // Same reason as the other rejection test above: build the baseline once and
+  // compare against that instance, or `lastUpdate`'s `Date.now()` makes this flaky.
+  const initial = wp.defaultState();
+  const out = wp.reduce(initial, 'load-video', {
     provider: 'soundcloud',
     videoId: 'sc-track-some/slug',
   });
   assert.ok(out, 'the rejection must be reported, not swallowed');
-  assert.deepEqual(out.state, wp.defaultState(), 'nothing broken enters state');
+  assert.deepEqual(out.state, initial, 'nothing broken enters state');
   assert.deepEqual(out.effects, [
     { type: 'send-to-sender', message: { type: 'queue-rejected', reason: 'invalid-media-url' } },
   ]);
