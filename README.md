@@ -20,6 +20,7 @@ InSession 本体（[`insession-app`](https://github.com/insession-space/insessio
 | [`@insession/space-state-react`](./packages/space-state-react) | 上を React の `useSyncExternalStore` に繋ぐ薄いラッパー |
 | [`@insession/plugin-pomodoro-state`](./packages/plugin-pomodoro-state) | 依存ゼロのポモドーロタイマー状態機械。server-authoritative で `reduce` は純関数 |
 | [`@insession/plugin-whiteboard-state`](./packages/plugin-whiteboard-state) | 依存ゼロのホワイトボード状態機械。自由描画の strokes/shapes と「お絵かき伝言ゲーム」relay を持つ `reduce` は純関数。唯一の外部依存（投稿画像URLの許可判定）はファクトリ `createWhiteboardState` の引数として注入する |
+| [`@insession/plugin-watch-party-state`](./packages/plugin-watch-party-state) | 依存ゼロの Watch Party（動画/音声の同期再生）状態機械。`reduce` は `{ state, effects }` を返す純関数で、broadcast/persist/タイトル解決は effect 記述子としてホストに委ねる。唯一の外部依存（ランダム再生の選択ロジック）はファクトリ `createWatchParty` の `pickShuffleIndex` 引数として注入する |
 
 plugin の **server 面**（UI・i18n・design-system への依存を持たない純粋な状態機械）はこのリポジトリへ移設する方針で、`plugin-pomodoro-state` / `plugin-whiteboard-state` がその実例。**UI を持つ部分**（client 面。`pomodoro-kit` 等）はプロダクト判断を抱えるため `insession-app` に残す
 （何をここへ入れてよいかの判断は `CLAUDE.md` の「入れるもの / 入れないもの」を参照）。
@@ -44,7 +45,8 @@ insession-sdk/
 │   ├── space-state/              # @insession/space-state
 │   ├── space-state-react/        # @insession/space-state-react
 │   ├── plugin-pomodoro-state/     # @insession/plugin-pomodoro-state
-│   └── plugin-whiteboard-state/   # @insession/plugin-whiteboard-state
+│   ├── plugin-whiteboard-state/   # @insession/plugin-whiteboard-state
+│   └── plugin-watch-party-state/  # @insession/plugin-watch-party-state
 ├── .changeset/
 ├── CLAUDE.md        # 作業規約（開発・changeset・リリース・置き場所の判断）
 └── .github/workflows/

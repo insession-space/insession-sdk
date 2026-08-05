@@ -13,10 +13,11 @@
 | `packages/space-state-react` | `@insession/space-state-react` | 上を React の `useSyncExternalStore` に繋ぐ薄いラッパー（1関数） | `space-state` / peer に `react` |
 | `packages/plugin-pomodoro-state` | `@insession/plugin-pomodoro-state` | 依存ゼロのポモドーロタイマー状態機械（server-authoritative。`reduce` は純関数、`restore`/`persistState` で永続化境界を扱う） | **なし** |
 | `packages/plugin-whiteboard-state` | `@insession/plugin-whiteboard-state` | 依存ゼロのホワイトボード状態機械（server-authoritative。自由描画の strokes/shapes と「お絵かき伝言ゲーム」relay を同居させた `reduce` は純関数） | **なし** |
+| `packages/plugin-watch-party-state` | `@insession/plugin-watch-party-state` | 依存ゼロの Watch Party（動画/音声の同期再生）状態機械（server-authoritative。`reduce` は `{ state, effects }` を返す純関数で、broadcast/永続化/タイトル解決は effect 記述子としてホストに委ねる） | **なし** |
 
-**依存の向きは `space-state-react` → `space-state` の一方向だけ。** `ws-resilient-transport` と `plugin-pomodoro-state` / `plugin-whiteboard-state` は完全に独立していて、他のパッケージと繋がっていない（transport と状態管理を分けているのが設計の要点なので、ここに依存を足さない）。
+**依存の向きは `space-state-react` → `space-state` の一方向だけ。** `ws-resilient-transport` と `plugin-pomodoro-state` / `plugin-whiteboard-state` / `plugin-watch-party-state` は完全に独立していて、他のパッケージと繋がっていない（transport と状態管理を分けているのが設計の要点なので、ここに依存を足さない）。
 
-**「依存ゼロ」は `ws-resilient-transport` / `space-state` / `plugin-pomodoro-state` / `plugin-whiteboard-state` の売り。** 便利だからという理由でランタイム依存を1つでも足すと、このパッケージを選ぶ理由が消える。足したくなったら、まずそれが本当にこのリポジトリに置くべきものかを下記「入れるもの / 入れないもの」で判断すること。
+**「依存ゼロ」は `ws-resilient-transport` / `space-state` / `plugin-pomodoro-state` / `plugin-whiteboard-state` / `plugin-watch-party-state` の売り。** 便利だからという理由でランタイム依存を1つでも足すと、このパッケージを選ぶ理由が消える。足したくなったら、まずそれが本当にこのリポジトリに置くべきものかを下記「入れるもの / 入れないもの」で判断すること。
 
 ## 開発の仕方
 
@@ -122,6 +123,8 @@ npm はアカウントの 2FA か bypass 2FA 付きトークンを要求する�
 **判断基準はこの1点に尽きる: 外部 import がゼロかどうか。** UI・i18n キー・`@insession/design-system` への依存が1つでもあれば `insession-app` に残す。**「server 面だから」で自動的に入れてよくなるわけではない** — 切り出した結果 import が1つでも残るなら、それは契約層ではなくプロダクトの一部なので向こうに置く。
 
 **`plugin-whiteboard-state` は「注入で解ければ移せる」という追加の型を示した。** 移植元の純粋部には唯一の外部依存（投稿画像URLが自前ストレージのものかを判定する `storage.isOwnUrl`）があり、これは InSession 固有のバケット設定を知っている。判断基準（外部 import がゼロか）自体は変わらないが、「元から import がゼロ」だけでなく「述語をホストから注入する形にして import をゼロにする」パターンでもここへ移せる。`plugin-whiteboard-state` はそれをファクトリ `createWhiteboardState({ isOwnImageUrl })` として実装した — SDK 側は「host が判定してくれる」という契約だけを持ち、InSession のストレージ設定そのものは持ち込まない。
+
+**`plugin-watch-party-state` はさらにもう一つの型を示した: 本物の副作用（broadcast・DB永続化・タイトル/尺の解決）を持つ plugin も、コールバック注入ではなく `@insession/space-state` と同じ「effect 記述子を返すだけ」の形にすれば、外部 import ゼロのまま移せる。** `plugin-pomodoro-state` / `plugin-whiteboard-state` の `reduce` は純粋な状態遷移だけを返せば足りたが、Watch Party の移植元は DB 書き込み・WS broadcast・YouTube oEmbed 取得を伴う。これらを `reduce` の内部で呼ぶ代わりに `{ state, effects: WatchPartyEffect[] }` を返し、実行はホストに委ねる（`resolve-metadata` effect でタイトル/尺の取得さえもホストへ投げ返す）。この設計のおかげで、I/O を持つ plugin であっても SDK 側は依然として「Date.now() 以外に副作用ゼロの純関数」のままでいられる。もう一つの外部依存だったランダム再生の選択ロジックは、`packages/protocol` がマイルームとも共有する単一ソースだったため、`plugin-whiteboard-state` の `isOwnImageUrl` と同じ注入パターン（`createWatchParty({ pickShuffleIndex })`）で解いた。
 
 **⚠ 名前の `plugin-` 接頭辞は「どの plugin 由来か」を示すだけで、置き場所の判断とは関係しない。** 上の表の「入れない」列にある **plugin** は `plugin-` で始まる名前のことではなく、UI・i18n キー・プロダクト判断を抱えた実体のことを指す。`plugin-pomodoro-state` が入れてよいのは名前がどうであれ外部 import がゼロだからで、逆に `plugin-` が付かない名前でも design-system を1つ引いていれば入れられない。**名前ではなく中身で判断すること。**
 

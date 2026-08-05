@@ -1,0 +1,850 @@
+// Run with: node --test packages/plugin-watch-party-state
+
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+import {
+  createWatchParty,
+  currentPosition,
+  defaultState,
+  type WatchPartyEffect,
+  type WatchPartyState,
+} from './index.ts';
+
+// Every test that depends on Date.now() replaces it for the duration of the
+// test and restores it afterwards, so timing is deterministic.
+function withFrozenClock<T>(nowMs: number, fn: () => T): T {
+  const orig = Date.now;
+  Date.now = () => nowMs;
+  try {
+    return fn();
+  } finally {
+    Date.now = orig;
+  }
+}
+
+const NOW = 1_700_000_000_000;
+
+const wp = createWatchParty();
+
+function effectsOf(result: { effects: WatchPartyEffect[] } | null): WatchPartyEffect[] {
+  return result?.effects ?? [];
+}
+
+function findBroadcast(effects: WatchPartyEffect[], type: string): any {
+  const found = effects.find((e) => e.type === 'broadcast' && (e.message as any)?.type === type) as
+    | { message: any }
+    | undefined;
+  return found?.message;
+}
+
+// --- currentPosition -------------------------------------------------------
+
+test('currentPosition: extrapolates while playing, returns the recorded value while stopped', () => {
+  const playing: WatchPartyState = {
+    ...defaultState(),
+    isPlaying: true,
+    position: 10,
+    lastUpdate: NOW,
+  };
+  const pos = withFrozenClock(NOW + 5_000, () => currentPosition(playing));
+  assert.equal(pos, 15);
+
+  const stopped: WatchPartyState = {
+    ...defaultState(),
+    isPlaying: false,
+    position: 42,
+    lastUpdate: NOW,
+  };
+  assert.equal(
+    withFrozenClock(NOW + 5_000, () => currentPosition(stopped)),
+    42,
+  );
+});
+
+// --- load-video -------------------------------------------------------------
+
+test('load-video: rejects an invalid videoId', () => {
+  assert.equal(wp.reduce(defaultState(), 'load-video', { videoId: 'short' }), null);
+  assert.equal(wp.reduce(defaultState(), 'load-video', {}), null);
+});
+
+test('load-video: accepts a valid YouTube id and resets position to 0/playing', () => {
+  const result = withFrozenClock(NOW, () =>
+    wp.reduce(defaultState(), 'load-video', { videoId: 'dQw4w9WgXcQ', by: 'alice' }),
+  );
+  assert.ok(result);
+  assert.equal(result?.state.videoId, 'dQw4w9WgXcQ');
+  assert.equal(result?.state.provider, 'youtube');
+  assert.equal(result?.state.isPlaying, true);
+  assert.equal(result?.state.position, 0);
+  assert.equal(result?.state.history.length, 1);
+  assert.equal(result?.state.history[0]?.videoId, 'dQw4w9WgXcQ');
+  const loadMsg = findBroadcast(effectsOf(result), 'load-video');
+  assert.ok(loadMsg);
+  assert.equal(loadMsg.by, 'alice');
+});
+
+test('load-video: unknown title emits a resolve-metadata effect for the history entry', () => {
+  const result = wp.reduce(defaultState(), 'load-video', { videoId: 'dQw4w9WgXcQ' });
+  const resolve = effectsOf(result).find((e) => e.type === 'resolve-metadata');
+  assert.ok(resolve);
+  assert.equal((resolve as any).kind, 'history');
+});
+
+test('load-video: known title skips the resolve-metadata effect', () => {
+  const result = wp.reduce(defaultState(), 'load-video', {
+    videoId: 'dQw4w9WgXcQ',
+    title: 'Never Gonna',
+  });
+  const resolve = effectsOf(result).find((e) => e.type === 'resolve-metadata');
+  assert.equal(resolve, undefined);
+  assert.equal(result?.state.history[0]?.title, 'Never Gonna');
+});
+
+test('load-video: soundcloud without a mediaUrl is rejected', () => {
+  const out = wp.reduce(defaultState(), 'load-video', {
+    provider: 'soundcloud',
+    videoId: 'sc-track-abc',
+  });
+  // Rejected, but not silently: nothing enters state and the sender is told why.
+  assert.ok(out);
+  assert.deepEqual(out.state, defaultState());
+  assert.deepEqual(out.effects, [
+    { type: 'send-to-sender', message: { type: 'queue-rejected', reason: 'invalid-media-url' } },
+  ]);
+});
+
+test('load-video: soundcloud with a mediaUrl is accepted', () => {
+  const result = wp.reduce(defaultState(), 'load-video', {
+    provider: 'soundcloud',
+    videoId: 'sc-track-abc',
+    mediaUrl: 'https://soundcloud.com/artist/track',
+  });
+  assert.ok(result);
+  assert.equal(result?.state.provider, 'soundcloud');
+  assert.equal(result?.state.mediaUrl, 'https://soundcloud.com/artist/track');
+});
+
+// --- play / pause / seek -----------------------------------------------------
+
+test('play: invalid/missing position keeps the current (extrapolated) position but sets isPlaying true', () => {
+  const stopped: WatchPartyState = {
+    ...defaultState(),
+    isPlaying: false,
+    position: 30,
+    lastUpdate: NOW,
+  };
+  const result = withFrozenClock(NOW + 2_000, () => wp.reduce(stopped, 'play', {}));
+  assert.ok(result);
+  assert.equal(result?.state.isPlaying, true);
+  assert.equal(result?.state.position, 30); // stopped, so currentPosition === position (no extrapolation)
+});
+
+test('play: valid position is honored', () => {
+  const result = wp.reduce(defaultState(), 'play', { position: 12.5 });
+  assert.ok(result);
+  assert.equal(result?.state.position, 12.5);
+  assert.equal(result?.state.isPlaying, true);
+  const msg = findBroadcast(effectsOf(result), 'play');
+  assert.equal(msg.position, 12.5);
+});
+
+test('play: broadcast excludes the sender', () => {
+  const result = wp.reduce(defaultState(), 'play', {});
+  const broadcast = effectsOf(result).find((e) => e.type === 'broadcast');
+  assert.equal((broadcast as any).excludeSender, true);
+});
+
+test('pause: always a no-op — no state change, no effects', () => {
+  const state: WatchPartyState = { ...defaultState(), isPlaying: true, position: 5 };
+  assert.equal(wp.reduce(state, 'pause', {}), null);
+  assert.equal(wp.reduce(defaultState(), 'pause', { position: 99 }), null);
+});
+
+test('seek: invalid position does nothing (no state change, no effects)', () => {
+  assert.equal(wp.reduce(defaultState(), 'seek', {}), null);
+  assert.equal(wp.reduce(defaultState(), 'seek', { position: -5 }), null);
+  assert.equal(wp.reduce(defaultState(), 'seek', { position: 'nope' }), null);
+  assert.equal(wp.reduce(defaultState(), 'seek', { position: NaN }), null);
+});
+
+test('seek: valid position updates state and preserves isPlaying', () => {
+  const playing: WatchPartyState = { ...defaultState(), isPlaying: true };
+  const result = wp.reduce(playing, 'seek', { position: 77 });
+  assert.ok(result);
+  assert.equal(result?.state.position, 77);
+  assert.equal(result?.state.isPlaying, true);
+  const msg = findBroadcast(effectsOf(result), 'seek');
+  assert.equal(msg.position, 77);
+  assert.equal(msg.isPlaying, true);
+});
+
+// --- video-ended --------------------------------------------------------
+
+test('video-ended: only the first report matching the current videoId is honored', () => {
+  const state: WatchPartyState = { ...defaultState(), videoId: 'dQw4w9WgXcQ', isPlaying: true };
+  // A different (stale) videoId is ignored.
+  assert.equal(wp.reduce(state, 'video-ended', { videoId: 'someOtherId' }), null);
+});
+
+test('video-ended: advances the queue when one is available', () => {
+  const state: WatchPartyState = {
+    ...defaultState(),
+    videoId: 'dQw4w9WgXcQ',
+    isPlaying: true,
+    queue: [
+      {
+        uid: 'q1',
+        videoId: 'aaaaaaaaaaa',
+        provider: 'youtube',
+        mediaUrl: null,
+        thumbnail: null,
+        title: 'Next One',
+        durationSec: null,
+        addedBy: 'bob',
+        addedByUid: 'uid-bob',
+        addSeq: 1,
+      },
+    ],
+  };
+  const result = wp.reduce(state, 'video-ended', { videoId: 'dQw4w9WgXcQ' });
+  assert.ok(result);
+  assert.equal(result?.state.videoId, 'aaaaaaaaaaa');
+  assert.equal(result?.state.queue.length, 0);
+  // Advanced automatically -> by defaults to the auto-advance sentinel.
+  const loadMsg = findBroadcast(effectsOf(result), 'load-video');
+  assert.equal(loadMsg.by, 'queue');
+});
+
+test('video-ended: mixActive short-circuits entirely (no state change, no effects, no queue touch)', () => {
+  const state: WatchPartyState = {
+    ...defaultState(),
+    videoId: 'dQw4w9WgXcQ',
+    isPlaying: true,
+    queue: [
+      {
+        uid: 'q1',
+        videoId: 'aaaaaaaaaaa',
+        provider: 'youtube',
+        mediaUrl: null,
+        thumbnail: null,
+        title: 'Next One',
+        durationSec: null,
+        addedBy: null,
+        addedByUid: null,
+        addSeq: 1,
+      },
+    ],
+  };
+  assert.equal(wp.reduce(state, 'video-ended', { videoId: 'dQw4w9WgXcQ', mixActive: true }), null);
+});
+
+test('video-ended: no queue and not a mix freezes isPlaying and locks in the position', () => {
+  const state: WatchPartyState = {
+    ...defaultState(),
+    videoId: 'dQw4w9WgXcQ',
+    isPlaying: true,
+    position: 100,
+    lastUpdate: NOW,
+  };
+  const result = withFrozenClock(NOW + 3_000, () =>
+    wp.reduce(state, 'video-ended', { videoId: 'dQw4w9WgXcQ' }),
+  );
+  assert.ok(result);
+  assert.equal(result?.state.isPlaying, false);
+  assert.equal(result?.state.position, 103); // extrapolated position at the moment of freeze
+  const persist = effectsOf(result).find((e) => e.type === 'persist-playback');
+  assert.ok(persist);
+});
+
+test('video-ended: already frozen (not playing) with an empty queue is a true no-op', () => {
+  const state: WatchPartyState = { ...defaultState(), videoId: 'dQw4w9WgXcQ', isPlaying: false };
+  assert.equal(wp.reduce(state, 'video-ended', { videoId: 'dQw4w9WgXcQ' }), null);
+});
+
+// --- request-sync ---------------------------------------------------------
+
+test('request-sync: no videoId is a no-op', () => {
+  assert.equal(wp.reduce(defaultState(), 'request-sync', {}), null);
+});
+
+test('request-sync: sends the current position/isPlaying only to the sender', () => {
+  const state: WatchPartyState = {
+    ...defaultState(),
+    videoId: 'dQw4w9WgXcQ',
+    isPlaying: true,
+    position: 10,
+    lastUpdate: NOW,
+  };
+  const result = withFrozenClock(NOW + 1_000, () => wp.reduce(state, 'request-sync', {}));
+  assert.ok(result);
+  assert.equal(result?.state, state); // unchanged
+  const effects = effectsOf(result);
+  assert.equal(effects.length, 1);
+  assert.equal(effects[0]?.type, 'send-to-sender');
+  assert.equal((effects[0] as any).message.position, 11);
+});
+
+// --- queue-add --------------------------------------------------------------
+
+test('queue-add: rejects an invalid videoId', () => {
+  assert.equal(wp.reduce(defaultState(), 'queue-add', { videoId: 'x' }), null);
+});
+
+test('queue-add: adds to the queue, bumps addSeq, and does not auto-play when already playing', () => {
+  const state: WatchPartyState = { ...defaultState(), videoId: 'dQw4w9WgXcQ', isPlaying: true };
+  const result = wp.reduce(state, 'queue-add', { videoId: 'aaaaaaaaaaa', addedBy: 'alice' });
+  assert.ok(result);
+  assert.equal(result?.state.queue.length, 1);
+  assert.equal(result?.state.queue[0]?.videoId, 'aaaaaaaaaaa');
+  assert.equal(result?.state.queue[0]?.addSeq, 1);
+  assert.equal(result?.state.videoId, 'dQw4w9WgXcQ'); // unchanged — did not auto-play
+});
+
+test('queue-add: auto-plays when nothing was loaded yet', () => {
+  const result = wp.reduce(defaultState(), 'queue-add', {
+    videoId: 'aaaaaaaaaaa',
+    addedBy: 'alice',
+  });
+  assert.ok(result);
+  assert.equal(result?.state.videoId, 'aaaaaaaaaaa');
+  assert.equal(result?.state.queue.length, 0); // popped straight back off
+});
+
+test('queue-add: auto-plays when stopped and this is the only queued item', () => {
+  const state: WatchPartyState = {
+    ...defaultState(),
+    videoId: 'dQw4w9WgXcQ',
+    isPlaying: false,
+  };
+  const result = wp.reduce(state, 'queue-add', { videoId: 'aaaaaaaaaaa' });
+  assert.ok(result);
+  assert.equal(result?.state.videoId, 'aaaaaaaaaaa');
+});
+
+test('queue-add: over the max queue length rejects', () => {
+  let s: WatchPartyState = defaultState();
+  for (let i = 0; i < 50; i++) {
+    const added = wp.reduce({ ...s, videoId: 'dQw4w9WgXcQ', isPlaying: true }, 'queue-add', {
+      videoId: 'aaaaaaaaaaa',
+    });
+    assert.ok(added);
+    s = added.state;
+  }
+  assert.equal(s.queue.length, 50);
+  assert.equal(
+    wp.reduce({ ...s, videoId: 'dQw4w9WgXcQ', isPlaying: true }, 'queue-add', {
+      videoId: 'bbbbbbbbbbb',
+    }),
+    null,
+  );
+});
+
+test('queue-add: custom maxQueueLength is honored', () => {
+  const state: WatchPartyState = {
+    ...defaultState(),
+    videoId: 'dQw4w9WgXcQ',
+    isPlaying: true,
+    queue: [
+      {
+        uid: 'q1',
+        videoId: 'aaaaaaaaaaa',
+        provider: 'youtube',
+        mediaUrl: null,
+        thumbnail: null,
+        title: null,
+        durationSec: null,
+        addedBy: null,
+        addedByUid: null,
+        addSeq: 1,
+      },
+    ],
+  };
+  assert.equal(wp.reduce(state, 'queue-add', { videoId: 'bbbbbbbbbbb', maxQueueLength: 1 }), null);
+});
+
+test('queue-add: maxPerUser rejects once the same adder hits the cap', () => {
+  const state: WatchPartyState = {
+    ...defaultState(),
+    videoId: 'dQw4w9WgXcQ',
+    isPlaying: true,
+    queue: [
+      {
+        uid: 'q1',
+        videoId: 'aaaaaaaaaaa',
+        provider: 'youtube',
+        mediaUrl: null,
+        thumbnail: null,
+        title: null,
+        durationSec: null,
+        addedBy: 'alice',
+        addedByUid: null,
+        addSeq: 1,
+      },
+    ],
+  };
+  // 拒否は握り潰さず、理由と上限を送信者へ返す（移植元と同じ形）。
+  const capped = wp.reduce(state, 'queue-add', {
+    videoId: 'bbbbbbbbbbb',
+    addedBy: 'alice',
+    maxPerUser: 1,
+  });
+  assert.ok(capped);
+  assert.equal(capped.state.queue.length, 1, '積まれていない');
+  assert.deepEqual(capped.effects, [
+    {
+      type: 'send-to-sender',
+      message: { type: 'queue-rejected', reason: 'max-per-user', limit: 1 },
+    },
+  ]);
+  assert.ok(
+    wp.reduce(state, 'queue-add', { videoId: 'bbbbbbbbbbb', addedBy: 'carol', maxPerUser: 1 }),
+  );
+});
+
+test('queue-add: maxDurationSec rejects an over-limit resolved duration, but null duration fails open', () => {
+  const state: WatchPartyState = { ...defaultState(), videoId: 'dQw4w9WgXcQ', isPlaying: true };
+  const tooLong = wp.reduce(state, 'queue-add', {
+    videoId: 'aaaaaaaaaaa',
+    durationSec: 700,
+    maxDurationSec: 600,
+  });
+  assert.ok(tooLong);
+  assert.equal(tooLong.state.queue.length, 0, '積まれていない');
+  assert.deepEqual(tooLong.effects, [
+    {
+      type: 'send-to-sender',
+      message: { type: 'queue-rejected', reason: 'max-duration', limit: 600 },
+    },
+  ]);
+  const ok = wp.reduce(state, 'queue-add', { videoId: 'aaaaaaaaaaa', maxDurationSec: 600 }); // unresolved
+  assert.ok(ok);
+});
+
+test('queue-add: unknown title emits a resolve-metadata effect for the queue item', () => {
+  const state: WatchPartyState = { ...defaultState(), videoId: 'dQw4w9WgXcQ', isPlaying: true };
+  const result = wp.reduce(state, 'queue-add', { videoId: 'aaaaaaaaaaa' });
+  const resolve = effectsOf(result).find((e) => e.type === 'resolve-metadata');
+  assert.ok(resolve);
+  assert.equal((resolve as any).kind, 'queue');
+});
+
+test('insertByAddSeq (via queue-add): items without addSeq sort to the front', () => {
+  const restored: WatchPartyState = {
+    ...defaultState(),
+    videoId: 'dQw4w9WgXcQ',
+    isPlaying: true,
+    queue: [
+      {
+        uid: 'restored-1',
+        videoId: 'aaaaaaaaaaa',
+        provider: 'youtube',
+        mediaUrl: null,
+        thumbnail: null,
+        title: null,
+        durationSec: null,
+        addedBy: null,
+        addedByUid: null,
+        addSeq: undefined as unknown as number, // simulate a legacy row with no addSeq
+      },
+    ],
+  };
+  const result = wp.reduce(restored, 'queue-add', { videoId: 'bbbbbbbbbbb' });
+  assert.ok(result);
+  assert.deepEqual(
+    result?.state.queue.map((q) => q.videoId),
+    ['aaaaaaaaaaa', 'bbbbbbbbbbb'],
+  );
+});
+
+// --- queue-remove / queue-clear / queue-reorder / queue-play / queue-play-next ---
+
+function withQueue(items: Array<{ uid: string; videoId: string }>): WatchPartyState {
+  return {
+    ...defaultState(),
+    videoId: 'dQw4w9WgXcQ',
+    isPlaying: true,
+    queue: items.map((it, i) => ({
+      uid: it.uid,
+      videoId: it.videoId,
+      provider: 'youtube' as const,
+      mediaUrl: null,
+      thumbnail: null,
+      title: `title-${it.uid}`,
+      durationSec: null,
+      addedBy: null,
+      addedByUid: null,
+      addSeq: i + 1,
+    })),
+  };
+}
+
+test('queue-remove: removes the matching item, no-ops if not found', () => {
+  const state = withQueue([
+    { uid: 'q1', videoId: 'aaaaaaaaaaa' },
+    { uid: 'q2', videoId: 'bbbbbbbbbbb' },
+  ]);
+  const result = wp.reduce(state, 'queue-remove', { uid: 'q1' });
+  assert.ok(result);
+  assert.deepEqual(
+    result?.state.queue.map((q) => q.uid),
+    ['q2'],
+  );
+  assert.equal(wp.reduce(state, 'queue-remove', { uid: 'ghost' }), null);
+});
+
+test('queue-clear: empties the queue, no-ops if already empty', () => {
+  const state = withQueue([{ uid: 'q1', videoId: 'aaaaaaaaaaa' }]);
+  const result = wp.reduce(state, 'queue-clear', {});
+  assert.ok(result);
+  assert.deepEqual(result?.state.queue, []);
+  assert.equal(wp.reduce(defaultState(), 'queue-clear', {}), null);
+});
+
+test('queue-reorder: moves an item, ignored while shuffle is enabled', () => {
+  const state = withQueue([
+    { uid: 'q1', videoId: 'aaaaaaaaaaa' },
+    { uid: 'q2', videoId: 'bbbbbbbbbbb' },
+    { uid: 'q3', videoId: 'ccccccccccc' },
+  ]);
+  const result = wp.reduce(state, 'queue-reorder', { uid: 'q1', toIndex: 2 });
+  assert.ok(result);
+  assert.deepEqual(
+    result?.state.queue.map((q) => q.uid),
+    ['q2', 'q3', 'q1'],
+  );
+  assert.equal(
+    wp.reduce(state, 'queue-reorder', { uid: 'q1', toIndex: 2, shuffleEnabled: true }),
+    null,
+  );
+});
+
+test('queue-play: plays the targeted item regardless of position, removes it from the queue', () => {
+  const state = withQueue([
+    { uid: 'q1', videoId: 'aaaaaaaaaaa' },
+    { uid: 'q2', videoId: 'bbbbbbbbbbb' },
+  ]);
+  const result = wp.reduce(state, 'queue-play', { uid: 'q2', by: 'alice' });
+  assert.ok(result);
+  assert.equal(result?.state.videoId, 'bbbbbbbbbbb');
+  assert.deepEqual(
+    result?.state.queue.map((q) => q.uid),
+    ['q1'],
+  );
+  const loadMsg = findBroadcast(effectsOf(result), 'load-video');
+  assert.equal(loadMsg.by, 'alice');
+});
+
+test('queue-play-next: FIFO by default (index 0), no-ops on an empty queue', () => {
+  const state = withQueue([
+    { uid: 'q1', videoId: 'aaaaaaaaaaa' },
+    { uid: 'q2', videoId: 'bbbbbbbbbbb' },
+  ]);
+  const result = wp.reduce(state, 'queue-play-next', { by: 'bob' });
+  assert.ok(result);
+  assert.equal(result?.state.videoId, 'aaaaaaaaaaa');
+  const loadMsg = findBroadcast(effectsOf(result), 'load-video');
+  assert.equal(loadMsg.by, 'bob');
+  assert.equal(wp.reduce(defaultState(), 'queue-play-next', {}), null);
+});
+
+test('queue-play-next: shuffle uses the injected pickShuffleIndex', () => {
+  const shuffled = createWatchParty({ pickShuffleIndex: () => 1 });
+  const state = withQueue([
+    { uid: 'q1', videoId: 'aaaaaaaaaaa' },
+    { uid: 'q2', videoId: 'bbbbbbbbbbb' },
+  ]);
+  const result = shuffled.reduce(state, 'queue-play-next', { shuffleEnabled: true });
+  assert.ok(result);
+  assert.equal(result?.state.videoId, 'bbbbbbbbbbb');
+  // The unpicked item remains queued.
+  assert.deepEqual(
+    result?.state.queue.map((q) => q.uid),
+    ['q1'],
+  );
+});
+
+test('queue-play-next: without pickShuffleIndex, shuffleEnabled is inert (still FIFO)', () => {
+  const state = withQueue([
+    { uid: 'q1', videoId: 'aaaaaaaaaaa' },
+    { uid: 'q2', videoId: 'bbbbbbbbbbb' },
+  ]);
+  const result = wp.reduce(state, 'queue-play-next', { shuffleEnabled: true });
+  assert.equal(result?.state.videoId, 'aaaaaaaaaaa');
+});
+
+test('queue-play-next: default autoAdvanceBy is "queue" when no by is given', () => {
+  const state = withQueue([{ uid: 'q1', videoId: 'aaaaaaaaaaa' }]);
+  const result = wp.reduce(state, 'queue-play-next', {});
+  const loadMsg = findBroadcast(effectsOf(result), 'load-video');
+  assert.equal(loadMsg.by, 'queue');
+});
+
+test('createWatchParty: autoAdvanceBy is configurable', () => {
+  const custom = createWatchParty({ autoAdvanceBy: 'auto-dj' });
+  const state = withQueue([{ uid: 'q1', videoId: 'aaaaaaaaaaa' }]);
+  const result = custom.reduce(state, 'queue-play-next', {});
+  const loadMsg = findBroadcast(effectsOf(result), 'load-video');
+  assert.equal(loadMsg.by, 'auto-dj');
+});
+
+// --- resolve-metadata -------------------------------------------------------
+
+test('resolve-metadata: patches a queue item by uid, no-op if not found', () => {
+  const state = withQueue([{ uid: 'q1', videoId: 'aaaaaaaaaaa' }]);
+  const patched: WatchPartyState = { ...state, queue: [{ ...state.queue[0], title: null }] };
+  const result = wp.reduce(patched, 'resolve-metadata', { uid: 'q1', title: 'Resolved Title' });
+  assert.ok(result);
+  assert.equal(result?.state.queue[0]?.title, 'Resolved Title');
+  assert.equal(wp.reduce(state, 'resolve-metadata', { uid: 'ghost', title: 'x' }), null);
+});
+
+test('resolve-metadata: patches a history item by uid+kind', () => {
+  const state: WatchPartyState = {
+    ...defaultState(),
+    history: [
+      {
+        uid: 'h1',
+        videoId: 'aaaaaaaaaaa',
+        provider: 'youtube',
+        mediaUrl: null,
+        thumbnail: null,
+        title: null,
+        durationSec: null,
+        by: null,
+        byUid: null,
+        ts: NOW,
+      },
+    ],
+  };
+  const result = wp.reduce(state, 'resolve-metadata', {
+    uid: 'h1',
+    kind: 'history',
+    title: 'Resolved',
+  });
+  assert.ok(result);
+  assert.equal(result?.state.history[0]?.title, 'Resolved');
+});
+
+test('resolve-metadata: does not clobber an already-known title', () => {
+  const state = withQueue([{ uid: 'q1', videoId: 'aaaaaaaaaaa' }]); // title already set to 'title-q1'
+  assert.equal(wp.reduce(state, 'resolve-metadata', { uid: 'q1', title: 'Different' }), null);
+});
+
+test('resolve-metadata: no title/duration provided is a no-op', () => {
+  const state = withQueue([{ uid: 'q1', videoId: 'aaaaaaaaaaa' }]);
+  assert.equal(wp.reduce(state, 'resolve-metadata', { uid: 'q1' }), null);
+});
+
+// --- broadcast stripping (point (e)) ---------------------------------------
+
+test('queue-update broadcasts never carry addedByUid/addSeq', () => {
+  const state: WatchPartyState = { ...defaultState(), videoId: 'dQw4w9WgXcQ', isPlaying: true };
+  const result = wp.reduce(state, 'queue-add', {
+    videoId: 'aaaaaaaaaaa',
+    addedBy: 'alice',
+    addedByUid: 'uid-alice',
+  });
+  const msg = findBroadcast(effectsOf(result), 'queue-update');
+  assert.ok(msg);
+  for (const item of msg.queue) {
+    assert.equal('addedByUid' in item, false);
+    assert.equal('addSeq' in item, false);
+  }
+});
+
+test('history-update broadcasts never carry byUid', () => {
+  const result = wp.reduce(defaultState(), 'load-video', {
+    videoId: 'dQw4w9WgXcQ',
+    byUid: 'uid-alice',
+  });
+  const msg = findBroadcast(effectsOf(result), 'history-update');
+  assert.ok(msg);
+  for (const item of msg.history) {
+    assert.equal('byUid' in item, false);
+  }
+});
+
+// --- restore ------------------------------------------------------------
+
+test('restore: null/string/number input returns null', () => {
+  assert.equal(wp.restore(null), null);
+  assert.equal(wp.restore('nope'), null);
+  assert.equal(wp.restore(42), null);
+});
+
+test('restore: always comes back stopped even if the input says playing', () => {
+  const next = wp.restore({ videoId: 'dQw4w9WgXcQ', isPlaying: true, position: 55 });
+  assert.ok(next);
+  assert.equal(next?.isPlaying, false);
+  assert.equal(next?.position, 55);
+  assert.equal(next?.videoId, 'dQw4w9WgXcQ');
+  assert.equal(next?.provider, 'youtube');
+});
+
+test('restore: no videoId means no provider either', () => {
+  const next = wp.restore({});
+  assert.ok(next);
+  assert.equal(next?.videoId, null);
+  assert.equal(next?.provider, null);
+});
+
+test('restore: filters malformed queue/history entries and keeps valid ones', () => {
+  const next = wp.restore({
+    queue: [
+      { uid: 'q1', videoId: 'aaaaaaaaaaa', addSeq: 3 },
+      { uid: 'bad', videoId: 'nope' },
+      null,
+      {},
+    ],
+    history: [
+      { uid: 'h1', videoId: 'bbbbbbbbbbb', ts: NOW },
+      { uid: 'bad', videoId: 'x' },
+    ],
+  });
+  assert.ok(next);
+  assert.deepEqual(
+    next?.queue.map((q) => q.uid),
+    ['q1'],
+  );
+  assert.deepEqual(
+    next?.history.map((h) => h.uid),
+    ['h1'],
+  );
+  assert.equal(next?.queueSeq, 3); // picked up from the surviving item's addSeq
+});
+
+test('restore: array input is typeof "object" so it degrades to a safe empty state, not null', () => {
+  const next = wp.restore([1, 2, 3]);
+  assert.ok(next);
+  assert.deepEqual(next?.queue, []);
+  assert.deepEqual(next?.history, []);
+});
+
+test('restore: caps queue/history at their max lengths', () => {
+  const queue = Array.from({ length: 60 }, (_, i) => ({
+    uid: `q${i}`,
+    videoId: 'aaaaaaaaaaa',
+    addSeq: i,
+  }));
+  const history = Array.from({ length: 60 }, (_, i) => ({
+    uid: `h${i}`,
+    videoId: 'aaaaaaaaaaa',
+    ts: NOW + i,
+  }));
+  const next = wp.restore({ queue, history });
+  assert.ok(next);
+  assert.equal(next?.queue.length, 50);
+  assert.equal(next?.history.length, 50);
+});
+
+test('restore: negative/invalid position clamps to 0', () => {
+  assert.equal(wp.restore({ position: -5 })?.position, 0);
+  assert.equal(wp.restore({ position: 'nope' })?.position, 0);
+});
+
+// --- unknown action / null-state fallback -----------------------------------
+
+test('unknown action returns null', () => {
+  assert.equal(wp.reduce(defaultState(), 'not-a-real-action'), null);
+});
+
+test('reduce falls back to defaultState() when given null/undefined state', () => {
+  const result = wp.reduce(null, 'load-video', { videoId: 'dQw4w9WgXcQ' });
+  assert.ok(result);
+  assert.equal(result?.state.videoId, 'dQw4w9WgXcQ');
+});
+
+// --- factory instances are independent --------------------------------------
+
+test('two createWatchParty() instances do not share pickShuffleIndex/autoAdvanceBy', () => {
+  const a = createWatchParty({ pickShuffleIndex: () => 0, autoAdvanceBy: 'a' });
+  const b = createWatchParty({ pickShuffleIndex: () => 0, autoAdvanceBy: 'b' });
+  const state = withQueue([{ uid: 'q1', videoId: 'aaaaaaaaaaa' }]);
+  const resultA = a.reduce(state, 'queue-play-next', {});
+  const resultB = b.reduce(state, 'queue-play-next', {});
+  assert.equal(findBroadcast(effectsOf(resultA), 'load-video').by, 'a');
+  assert.equal(findBroadcast(effectsOf(resultB), 'load-video').by, 'b');
+});
+
+// This package is published for browsers as well as servers, so it must not
+// reach for Node-only globals. `Buffer` was used in an earlier plugin-state
+// package's byte cap and threw `ReferenceError: Buffer is not defined` in a
+// browser the moment it ran — a failure no Node-side test could ever catch.
+test('does not depend on Node-only globals (browser-safe)', () => {
+  const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8')
+    // Strip comments first: this file *documents* why Node-only globals are
+    // avoided, and that prose must not trip the check that no code uses them.
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  for (const nodeOnly of ['Buffer.', 'process.env', 'require(', '__dirname']) {
+    assert.ok(
+      !source.includes(nodeOnly),
+      `index.ts must not use the Node-only global \`${nodeOnly}\` — this package runs in browsers too`,
+    );
+  }
+});
+
+// A SoundCloud load without a resolvable media URL must tell the sender why.
+// Returning a bare `null` here would leave the click looking like a no-op, and
+// the source this was ported from does report it.
+test('load-video: rejecting a SoundCloud item without a media URL notifies the sender', () => {
+  const wp = createWatchParty();
+  const out = wp.reduce(wp.defaultState(), 'load-video', {
+    provider: 'soundcloud',
+    videoId: 'sc-track-some/slug',
+  });
+  assert.ok(out, 'the rejection must be reported, not swallowed');
+  assert.deepEqual(out.state, wp.defaultState(), 'nothing broken enters state');
+  assert.deepEqual(out.effects, [
+    { type: 'send-to-sender', message: { type: 'queue-rejected', reason: 'invalid-media-url' } },
+  ]);
+});
+
+// Every rejection the source reported on the wire must still be reported.
+// Collapsing these into a bare `null` would make a refused add look exactly
+// like a click that did nothing.
+test('queue-add: each rejection tells the sender why', () => {
+  const wp = createWatchParty();
+  const base = wp.defaultState();
+  // ⚠ 何も再生していない state への queue-add は「即再生」になりキューに積まれない。
+  // 上限の検証には、先に再生中の state を作っておく必要がある。
+  const playing = wp.reduce(base, 'load-video', { videoId: 'zyxwvutsrqp', by: 'alice' })!.state;
+  const add = (state: WatchPartyState, extra: Record<string, unknown>) =>
+    wp.reduce(state, 'queue-add', { videoId: 'abcdefghijk', addedBy: 'alice', ...extra });
+
+  // per-member cap
+  const first = add(playing, { maxPerUser: 1 });
+  assert.ok(first);
+  const overCap = add(first.state, { maxPerUser: 1 });
+  assert.ok(overCap);
+  assert.deepEqual(overCap.effects, [
+    {
+      type: 'send-to-sender',
+      message: { type: 'queue-rejected', reason: 'max-per-user', limit: 1 },
+    },
+  ]);
+  assert.equal(overCap.state.queue.length, 1, 'nothing was added');
+
+  // duration cap
+  const tooLong = add(playing, { durationSec: 9999, maxDurationSec: 600 });
+  assert.ok(tooLong);
+  assert.deepEqual(tooLong.effects, [
+    {
+      type: 'send-to-sender',
+      message: { type: 'queue-rejected', reason: 'max-duration', limit: 600 },
+    },
+  ]);
+
+  // SoundCloud without a media URL
+  const broken = wp.reduce(playing, 'queue-add', {
+    provider: 'soundcloud',
+    videoId: 'sc-track-abc',
+    addedBy: 'alice',
+  });
+  assert.ok(broken);
+  assert.deepEqual(broken.effects, [
+    { type: 'send-to-sender', message: { type: 'queue-rejected', reason: 'invalid-media-url' } },
+  ]);
+});

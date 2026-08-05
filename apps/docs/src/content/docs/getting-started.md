@@ -1,9 +1,9 @@
 ---
 title: Getting started
-description: What the five @insession packages are, how they fit together, and which one to reach for first.
+description: What the six @insession packages are, how they fit together, and which one to reach for first.
 ---
 
-The `@insession` SDK is five small packages pulled out of a production realtime
+The `@insession` SDK is six small packages pulled out of a production realtime
 app. They are independent enough that you can adopt one and ignore the rest.
 
 | Package | What it does | Runtime dependencies |
@@ -13,6 +13,7 @@ app. They are independent enough that you can adopt one and ignore the rest.
 | [`@insession/space-state-react`](/packages/space-state-react/) | Binds the store to React via `useSyncExternalStore`. One hook. | `@insession/space-state` (+ `react` as a peer) |
 | [`@insession/plugin-pomodoro-state`](/packages/plugin-pomodoro-state/) | A server-authoritative Pomodoro timer state machine: pure `reduce`, plus `restore`/`persistState` for the storage boundary. | none |
 | [`@insession/plugin-whiteboard-state`](/packages/plugin-whiteboard-state/) | A server-authoritative Whiteboard state machine: shared free-draw strokes/shapes plus an optional "drawing telephone" relay game. | none |
+| [`@insession/plugin-watch-party-state`](/packages/plugin-watch-party-state/) | A server-authoritative Watch Party state machine: synchronized video/audio playback with a queue and history. `reduce` returns `{ state, effects }` — no I/O of its own. | none |
 
 ## How they fit together
 
@@ -51,6 +52,11 @@ store stays testable with no server and no browser at all.
 - **You need a shared drawing canvas, optionally with a "drawing telephone"
   relay game.** Take `plugin-whiteboard-state` alone. Same shape as
   `plugin-pomodoro-state` — a state machine only.
+- **You need synchronized video/audio playback with a queue.** Take
+  `plugin-watch-party-state` alone. Unlike the other two plugin-state
+  packages, it has genuine side effects (broadcast, persist, resolve a
+  title) — `reduce` returns them as effect descriptors instead of performing
+  them, so it stays a pure function you can test without a transport.
 
 ## Install
 
