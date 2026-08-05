@@ -9,5 +9,10 @@ dist/
 .DS_Store
 *.log
 
+# Claude Code が作る git worktree の置き場。中に各ブランチのチェックアウトが丸ごと入るため、
+# 無視しないと biome が worktree 側の biome.json を「入れ子の root 設定」として拾い、
+# worktree が1つでも存在すると `pnpm verify` がローカルで落ちる（CI は clean checkout なので気づけない）。
+.claude/
+
 # pnpm
 .pnpm-store/

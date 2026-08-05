@@ -1,0 +1,58 @@
+{
+  "name": "@insession/pomodoro-state",
+  "version": "0.0.0",
+  "description": "A dependency-free, framework-agnostic Pomodoro timer state machine. The server holds the authoritative state; reduce() is a pure function.",
+  "//": "このパッケージは insession-app の plugin-pomodoro の server 面(純粋関数のみ)を切り出したもので、UI・i18n・design-system への依存を持たないため SDK に置ける。UI 側(pomodoro-kit)と plugin 本体は insession-app に残る。",
+  "//exports": "ESM に加えて CJS も出しているのは、消費者である insession-app のサーバーがビルドせず .ts を直接実行しており require() で読むため。ESM only にすると require が壊れる。",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pomodoro",
+    "timer",
+    "state-machine",
+    "reducer",
+    "realtime"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/insession-space/insession-sdk.git",
+    "directory": "packages/pomodoro-state"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "module": "./dist/index.js",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "//publishConfig": "registry を明示するのは必須。開発機の ~/.npmrc が社内プロキシを registry に設定している場合、これが無いと npm publish がプロキシ宛になり公開レジストリへ出ない（design-system と同じ理由）。",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "node --test",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "//dependencies": "依存ゼロ。Date.now() 以外の外部入力を持たない純粋な状態機械であること自体がこのパッケージの売り。",
+  "dependencies": {},
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0"
+  }
+}

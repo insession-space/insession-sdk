@@ -50,6 +50,7 @@ export default defineConfig({
             { label: 'ws-resilient-transport', slug: 'packages/ws-resilient-transport' },
             { label: 'space-state', slug: 'packages/space-state' },
             { label: 'space-state-react', slug: 'packages/space-state-react' },
+            { label: 'pomodoro-state', slug: 'packages/pomodoro-state' },
           ],
         },
       ],

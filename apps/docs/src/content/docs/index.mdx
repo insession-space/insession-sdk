@@ -4,7 +4,7 @@ description: Zero-dependency building blocks for realtime shared rooms — a res
 template: splash
 hero:
   title: Realtime rooms, without the plumbing
-  tagline: Three small, zero-dependency packages pulled out of a production realtime app — a WebSocket transport that survives deploys, and a state store you can test without a server.
+  tagline: Four small, zero-dependency packages pulled out of a production realtime app — a WebSocket transport that survives deploys, and state stores you can test without a server.
   actions:
     - text: Get started
       link: /getting-started/
@@ -72,11 +72,28 @@ hero:
       <a href="https://www.npmjs.com/package/@insession/space-state-react">npm</a>
     </div>
   </div>
+
+  <div class="pkg-card">
+    <h3>@insession/pomodoro-state</h3>
+    <p>
+      A server-authoritative Pomodoro timer state machine: a pure <code>reduce</code> over
+      start/pause/skip/configure and declarations/cheers, plus <code>restore</code>/
+      <code>persistState</code> for the storage boundary.
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">0 dependencies</span>
+      <span class="pkg-tag">pure reducer</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/packages/pomodoro-state/">Docs</a>
+      <a href="https://www.npmjs.com/package/@insession/pomodoro-state">npm</a>
+    </div>
+  </div>
 </div>
 
 <p class="dep-note">
   Only one edge between them: <code>space-state-react</code> → <code>space-state</code>.
-  <code>ws-resilient-transport</code> is independent — carrying bytes and holding state are
+  <code>ws-resilient-transport</code> and <code>pomodoro-state</code> are independent — carrying bytes and holding state are
   kept apart on purpose, so you can adopt either one alone.
 </p>
 

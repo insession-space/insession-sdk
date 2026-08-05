@@ -11,10 +11,11 @@
 | `packages/ws-resilient-transport` | `@insession/ws-resilient-transport` | 本番デプロイの都合に合わせて再接続する WebSocket トランスポート（サービス再起動時の高速再接続 / ジッター付き指数バックオフ / terminal close code） | **なし** |
 | `packages/space-state` | `@insession/space-state` | transport・フレームワーク非依存のスペース状態 store。受信は純粋 reducer、送信は `onSend` に流すだけ、副作用は effect 記述子で返すだけ | **なし** |
 | `packages/space-state-react` | `@insession/space-state-react` | 上を React の `useSyncExternalStore` に繋ぐ薄いラッパー（1関数） | `space-state` / peer に `react` |
+| `packages/pomodoro-state` | `@insession/pomodoro-state` | 依存ゼロのポモドーロタイマー状態機械（server-authoritative。`reduce` は純関数、`restore`/`persistState` で永続化境界を扱う） | **なし** |
 
-**依存の向きは `space-state-react` → `space-state` の一方向だけ。** `ws-resilient-transport` は完全に独立していて、他の2つと繋がっていない（transport と状態管理を分けているのが設計の要点なので、ここに依存を足さない）。
+**依存の向きは `space-state-react` → `space-state` の一方向だけ。** `ws-resilient-transport` と `pomodoro-state` は完全に独立していて、他のパッケージと繋がっていない（transport と状態管理を分けているのが設計の要点なので、ここに依存を足さない）。
 
-**「依存ゼロ」は `ws-resilient-transport` と `space-state` の売り。** 便利だからという理由でランタイム依存を1つでも足すと、このパッケージを選ぶ理由が消える。足したくなったら、まずそれが本当にこのリポジトリに置くべきものかを下記「入れるもの / 入れないもの」で判断すること。
+**「依存ゼロ」は `ws-resilient-transport` / `space-state` / `pomodoro-state` の売り。** 便利だからという理由でランタイム依存を1つでも足すと、このパッケージを選ぶ理由が消える。足したくなったら、まずそれが本当にこのリポジトリに置くべきものかを下記「入れるもの / 入れないもの」で判断すること。
 
 ## 開発の仕方
 
@@ -79,6 +80,7 @@ npm はアカウントの 2FA か bypass 2FA 付きトークンを要求する�
 | --- | --- |
 | 汎用のランタイム（`ws-resilient-transport`。InSession 固有の情報を1つも含まない） | **plugin**（`plugin-pomodoro` 等）。UI・i18n キー・プロダクト判断を抱えるので `insession-app` 側に置く |
 | 依存ゼロの状態機械（`space-state`）とその薄いバインディング（`space-state-react`） | **UI を持つもの全般**。`@insession/design-system` への依存をこのリポジトリに持ち込まない |
+| **ただし plugin の server 面**（UI・i18n・design-system への依存を持たず、外部 import がゼロの純粋な状態機械）は入れてよい（`pomodoro-state`） | plugin の **client 面**（UI コンポーネント。`pomodoro-kit` 等） |
 
 **「`@insession/*` スコープだから」という理由だけでここへ移さないこと。** スコープは「OSS 候補である」という表明でしかなく、置き場所の判断とは別。plugin をここへ入れると次の3つが同時に起きる:
 
@@ -87,6 +89,12 @@ npm はアカウントの 2FA か bypass 2FA 付きトークンを要求する�
 3. **リリース周期が混ざる** — 契約層は安定していてほしいが、plugin はプロダクトと一緒に動く。同居させると採番が互いに引きずられる
 
 外部に「space を作れる SDK」を出すのに plugin は必須ではない。`definePluginClient` の**契約さえ配れば、消費者は自分の plugin を書ける**。plugin 自体を配りたくなったら、このリポジトリに足すのではなく別リポジトリを立てて判断する。
+
+### 例外: plugin の server 面（純粋な状態機械）は入れてよい
+
+`pomodoro-state` は `insession-app` の `plugin-pomodoro` から **server 面だけ**（`reduce` / `timerDelay` / `onTimer` / `restore` / `persistState`）を切り出したもので、上の禁止理由3点のどれにも当たらない — 依存ゼロなので (1) が起きず、消費者はアプリのサーバー1箇所だけで UI を持たないため (2) のパネル修正ごとの publish サイクルが発生せず、仕様が安定した純粋関数なので (3) の採番の引きずり合いも起きない。
+
+**判断基準はこの1点に尽きる: 外部 import がゼロかどうか。** UI・i18n キー・`@insession/design-system` への依存が1つでもあれば `insession-app` に残す。**「server 面だから」で自動的に入れてよくなるわけではない** — 切り出した結果 import が1つでも残るなら、それは契約層ではなくプロダクトの一部なので向こうに置く。
 
 ## README は「外部公開の配布物」
 
