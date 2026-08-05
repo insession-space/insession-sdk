@@ -1,13 +1,14 @@
 # @insession/space-state-react
 
-`@insession/space-state` の `SpaceStore` を React の `useSyncExternalStore` に繋ぐだけの
-薄いラッパー（1関数・約10行）。
+The React binding for [`@insession/space-state`](https://www.npmjs.com/package/@insession/space-state)
+— one hook, about ten lines, no logic of its own.
 
-## これは何か
-
-`@insession/space-state` はフレームワーク非依存の状態 store（React にも WebSocket にも
-依存しない）。React 側で state を読んで再レンダリングを起こすための配線だけをここに切り出した
-（#1720 step5）。ロジックは一切持たない。
+`@insession/space-state` is deliberately framework-agnostic: it depends on
+neither React nor a WebSocket implementation. Its `getState` / `subscribe` pair
+already satisfies the `useSyncExternalStore` contract (`getState()` returns the
+same reference while nothing has changed), so all that is left is the wiring.
+That wiring is this package, kept separate so the store itself stays free of a
+React dependency.
 
 ## Install
 
@@ -15,32 +16,61 @@
 npm install @insession/space-state-react @insession/space-state
 ```
 
-ビルド済み ESM パッケージ（`dist/index.js` + `dist/index.d.ts`）として配布する。`react` は
-peerDependency（`^19.0.0`）。（旧 InSession モノレポでは `.ts` ソースのまま消費されていた。）
+Published as a built ESM package (`dist/index.js` + `dist/index.d.ts`). `react`
+is a peer dependency (`^19.0.0`); `@insession/space-state` is a direct
+dependency but you will be importing it yourself anyway.
 
-## 使い方
+## Usage
 
 ```tsx
 import { createSpaceStore } from '@insession/space-state';
 import { useSpaceState } from '@insession/space-state-react';
 
-const store = createSpaceStore({ selfName: 'alice', t, getPresence });
+const store = createSpaceStore({
+  selfName: 'alice',
+  t: (key) => key,
+  getPresence: () => 'active',
+});
 
 function SpaceView() {
   const state = useSpaceState(store);
-  return <div>{state.members.length} 人が参加中</div>;
+
+  return (
+    <>
+      <p>{state.members.length} people here</p>
+      <ul>
+        {state.chatLines.map((line) => (
+          <li key={line.key}>{line.text}</li>
+        ))}
+      </ul>
+      <button type="button" onClick={() => store.chat.send('hello')}>
+        Say hello
+      </button>
+    </>
+  );
 }
 ```
 
+Reading state goes through the hook; sending goes straight to the store's local
+actions (`store.chat.send`, `store.presence.change`, …). There is no provider
+and no context — pass the store however you already pass values around.
+
 ## API
 
-- `useSpaceState(store: SpaceStore): SpaceState` — `store.subscribe` / `store.getState` を
-  `useSyncExternalStore` にそのまま渡す。`store` 側が「state が変わらない限り `getState()` は
-  同一参照を返す」契約を満たしているので、ここでの追加のメモ化は不要。
-- `getServerSnapshot` は渡さない。InSession に SSR は無く、`space-state` はブラウザの
-  WebSocket 接続を前提にした状態のため、サーバー側スナップショットに意味を持たせられない。
+| Export | Meaning |
+| --- | --- |
+| `useSpaceState(store: SpaceStore): SpaceState` | Subscribes to the store and re-renders on change. Hands `store.subscribe` and `store.getState` to `useSyncExternalStore` unchanged. |
 
-## テスト
+Two things worth knowing:
+
+- **No extra memoization is needed.** The store guarantees a stable reference
+  while state is unchanged, which is exactly what `useSyncExternalStore`
+  requires to skip a re-render.
+- **`getServerSnapshot` is not passed.** The store models a live connection, so
+  there is no meaningful server-side snapshot to hand back. Rendering a
+  component that calls this hook during SSR will throw — keep it client-side.
+
+## Test
 
 ```sh
 node --test

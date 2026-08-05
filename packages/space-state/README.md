@@ -1,21 +1,26 @@
 # @insession/space-state
 
-transport/フレームワーク非依存の**スペース状態 store**。サーバーから届く生のメッセージを
-純粋 reducer で畳み込み、副作用（音・通知・タイマー・送信）は実行せず記述子として返すだけの
-薄い状態管理層。
+A **dependency-free state store for realtime shared rooms** — members, chat,
+presence, typing indicators, pinned messages and pluggable per-room apps.
 
-## これは何か
+Most realtime state layers fuse three things that want to be separate: the
+reducer that folds inbound messages, the socket that carries them, and the
+side effects that fire when something happens (a sound, a notification, a
+timer). Fuse them and you can no longer test the interesting part — the state
+transitions — without standing up a server and a browser.
 
-InSession の `useSpace`（`@in-session/space-core`）が持っていた「受信メッセージの畳み込み」
-「チャット等のローカルアクション」「ローカル state 管理」を、React にも WebSocket 実装にも
-依存しない形で切り出したパッケージ（#1713）。
+This store keeps them apart:
 
-- **サーバーは要らない**。`receive()` にメッセージオブジェクトを渡すだけで動く（テストは
-  `node --test` でサーバー・ブラウザ・WebSocket 一切なしに完結する）。
-- **永続化は要らない**。state はプロセス内メモリのみ。DB や localStorage には触れない。
-- **依存ゼロ**。React・WebSocket・DOM はもちろん、`@in-session/protocol` にも依存しない。
-  - スペース設定（`settings`）の**中身はこの store が一切解釈しない**（丸ごと保持して置き換えるだけ）。したがって設定の型も既定値もここには持たず、既定値は `createSpaceStore({ initialSettings })` で**消費者が注入する**。「サーバーも永続化も要らない」のと同じ考え方で、設定の形は消費者のワイヤ契約の一部だという整理（#1713）。
-  - `ChatReactionSummary` / `PinnedMessage` は `./types.ts` に**汎用側の最小定義**として持つ。InSession のワイヤ契約としての正は `@in-session/protocol` 側で、**型が2箇所に分かれている**。ずれは `pnpm check:space-state-types` が機械的に突き合わせて検出する（任意フィールドの欠落・型の狭め・必須化・余計なフィールドの4通りで実際に落ちることを確認済み）。
+- **Inbound messages fold through a pure reducer.** `receive(msg)` runs
+  `reduceSpace`, which is a plain function of `(state, msg, ctx)`. No I/O.
+- **Outbound messages are handed off, not sent.** Local actions such as
+  `chat.send()` produce a message and pass it to whatever you registered with
+  `onSend`. The store never opens a socket.
+- **Side effects are returned as descriptors, never executed.** "Play the chat
+  sound", "show a notification", "clear this typing indicator in 3s" arrive at
+  your `onEffect` handler as data. What that means in your app is your call.
+- **Zero runtime dependencies.** No React, no WebSocket, no DOM. Tests run
+  under `node --test` with no server, no browser and no sockets.
 
 ## Install
 
@@ -23,62 +28,164 @@ InSession の `useSpace`（`@in-session/space-core`）が持っていた「受�
 npm install @insession/space-state
 ```
 
-ビルド済み ESM パッケージ（`dist/index.js` + `dist/index.d.ts`）として配布する。ランタイム
-依存はゼロ。（旧 InSession モノレポでは `.ts` ソースのまま消費されていた。）
+Published as a built ESM package (`dist/index.js` + `dist/index.d.ts`), no
+runtime dependencies. To bind it to React, add
+[`@insession/space-state-react`](https://www.npmjs.com/package/@insession/space-state-react).
 
-## 使い方
+## Usage
 
 ```ts
 import { createSpaceStore } from '@insession/space-state';
 
 const store = createSpaceStore({
   selfName: 'alice',
-  t: (key) => key, // i18n の t をそのまま渡せる。テストなら恒等関数でよい
+  t: (key) => key,            // any string resolver; pass your i18n `t`, or identity in tests
   getPresence: () => 'active',
 });
 
-// 送信を transport に配線する（実際の WebSocket 送信は呼び出し側の責務）
+// Outbound: wire local actions to your transport. Actually sending is your job.
 store.onSend((msg) => ws.send(JSON.stringify(msg)));
 
-// 副作用（音・通知・タイマー等）の実行も呼び出し側の責務。store 自身は実行しない
+// Effects: the store describes them, you execute them.
 store.onEffect((effect) => {
-  if (effect.kind === 'play-chat-sound') playChat();
+  if (effect.type === 'sound' && effect.sound === 'chat') playChatSound();
+  if (effect.type === 'notify-chat') notify(`${effect.name}: ${effect.text}`);
 });
 
-// 受信メッセージを渡すと reduceSpace が畳み込み、購読者へ通知する
+// Inbound: feed raw server messages in. The reducer folds them and notifies subscribers.
+ws.onmessage = (ev) => store.receive(JSON.parse(ev.data));
+
+// Read state / subscribe to changes (useSyncExternalStore contract:
+// getState() returns the same reference while nothing has changed).
+store.getState().members;
+const unsubscribe = store.subscribe(() => render());
+
+// Local actions: send to the server, and optimistically reflect locally where it matters.
+store.chat.send('hello');
+store.chat.react(messageId, '🎉');
+store.presence.change('away');
+store.settings.update({ theme: 'dark' });
+```
+
+### Testing without a server
+
+Because `receive` takes a plain object and effects are only descriptors, a full
+state transition is assertable in-process:
+
+```ts
+const store = createSpaceStore({ selfName: 'alice', t: (k) => k, getPresence: () => 'active' });
+const effects = [];
+store.onEffect((e) => effects.push(e));
+
 store.receive({ type: 'chat', name: 'bob', text: 'hi' });
 
-// state を読む / 変更を購読する（useSyncExternalStore の契約: 不変なら同一参照を返す）
-store.getState();
-store.subscribe(() => console.log('changed'));
-
-// ローカルアクション（サーバーへの送信 + 楽観的ローカル反映）
-store.chat.send('hello');
-store.settings.update({ watchParty: { enabled: false } });
+store.getState().chatLines.at(-1).text;
+// 'hi'
+effects;
+// [{ type: 'typing-timer-clear', name: 'bob' },
+//  { type: 'sound', sound: 'chat' },
+//  { type: 'notify-chat', name: 'bob', text: 'hi' }]
 ```
 
 ## API
 
-- `createSpaceStore(opts): SpaceStore` — store を生成する。`opts` は `selfName` / `t` /
-  `getPresence` / 任意の `now` / `genClientMsgId`（テストで決定論的にしたいときに差し替える）。
-- `store.receive(msg)` — サーバーからの生メッセージを渡す。内部で `reduceSpace`（純粋 reducer）
-  を通し、state を更新して effects を `onEffect` の購読者へ配る。
-- `store.getState()` / `store.subscribe(listener)` — `useSyncExternalStore` にそのまま渡せる
-  契約（state が変わらない限り `getState()` は同一参照を返す）。React へ繋ぐ薄いラッパーは
-  `@insession/space-state-react` の `useSpaceState` を使う。
-- `store.onSend(fn)` / `store.send(msg)` — ローカルアクション（`chat.send` 等）が生成した送信
-  メッセージを配る。実際の WebSocket 送信は購読者（transport）の責務。
-- `store.onEffect(fn)` — 副作用記述子（音・通知・タイマー等）を配る。実行は購読者の責務。
-- `store.chat` / `store.settings` / `store.presence` / `store.stage` — ローカルアクション群
-  （送信 + 必要なら楽観的ローカル反映）。
+### `createSpaceStore(options): SpaceStore`
 
-## テスト
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `selfName` | — | The local user's display name. Used to mark messages as your own. Replaceable later via `setSelfName`. |
+| `t` | — | String resolver `(key, ...args) => string` for system chat lines. Pass your i18n `t`, or the identity function. Replaceable later via `setT`. |
+| `getPresence` | — | `() => 'active' \| 'away'`. Read whenever the reducer needs your current presence. |
+| `now` | `Date.now` | Clock. Inject to make tests deterministic. |
+| `genClientMsgId` | `crypto.randomUUID` with fallback | Generates the temporary id that ties a locally echoed chat line to the server's eventual id. |
+| `plugins` | `[]` | Per-room app clients (see [Plugins](#plugins)). The core knows nothing app-specific on its own. |
+| `initialSettings` | `{}` | Default value for `state.settings`. The store never reads inside `settings` — the shape belongs to your wire contract, so you inject the defaults. |
+
+### Store methods
+
+| Member | Meaning |
+| --- | --- |
+| `receive(msg)` | Fold a raw inbound message. Updates state and dispatches effects. |
+| `getState()` / `subscribe(fn)` | `useSyncExternalStore`-compatible pair. `getState()` returns the same reference while state is unchanged. `subscribe` returns an unsubscribe function. |
+| `onSend(fn)` / `send(msg)` | Register a transport / push a raw outbound message. Returns an unsubscribe function. |
+| `onEffect(fn)` | Register an effect executor. Returns an unsubscribe function. |
+| `chat.send(text, replyTo?)` | Send a chat message and echo it locally right away (no round-trip wait). |
+| `chat.sendSticker(imageUrl)` | Send an image message; `imageUrl` is a URL you uploaded beforehand. |
+| `chat.react(messageId, emoji)` | Toggle an emoji reaction, optimistically applied locally. No-op when `messageId` is `null` (the message has no server id yet). |
+| `chat.pin(messageId)` | Pin a message, or unpin with `null`. The server stays authoritative. |
+| `chat.typing()` | Announce typing. Safe to call on every keystroke — calls within 1s are throttled away. |
+| `settings.update(patch)` | Send a settings patch. The store does not interpret its contents. |
+| `presence.change(p)` | Send `'active'` / `'away'`. |
+| `stage.change(stage)` | Send which card the local user is currently showing (`null` for none). |
+| `addChatLine(line)` | Append a local system line. |
+| `clearTyping(name)` / `expireAgentStatus(id, requestId)` | Called by you when the corresponding `typing-timer` / `agent-timer` effect fires. |
+| `reset()` | Reset connection-scoped state on disconnect. |
+| `setT(fn)` / `setSelfName(name)` | Swap the resolver / display name without reconnecting. |
+
+### Effects
+
+`onEffect` receives a `SpaceEffect` — a discriminated union on `type`:
+
+| `type` | Payload | What it asks you to do |
+| --- | --- | --- |
+| `sound` | `sound: 'join' \| 'chat'` | Play a sound. |
+| `notify-join` / `notify-chat` | `name`, and `text` for chat | Show a notification. Wording and mention detection are yours. |
+| `plugin-sound` / `plugin-notify` | `appId`, `sound` / `text` | Same, but originating from a plugin. Mapping `appId` to an actual sound is yours. |
+| `history-title` | `title` | Update your local visit history. |
+| `send` | `message` | Send this message (reducer-initiated, e.g. re-announcing presence). |
+| `typing-timer` / `typing-timer-clear` | `name` | Start a 3s timer that calls `clearTyping(name)` / cancel it. |
+| `agent-timer` / `agent-timer-clear` | `agentId`, `requestId` | Start a safety timer that calls `expireAgentStatus(...)` / cancel it. |
+
+### Plugins
+
+A room can host apps. The core carries no app-specific logic; each app supplies
+a `PluginClient` and the reducer calls it only for its own `appId`:
+
+```ts
+import { definePluginClient } from '@insession/space-state';
+
+const timer = definePluginClient({
+  id: 'timer',
+  // Seed this plugin's local slice (state.pluginLocal['timer']) on join/reconnect.
+  // Record previous values here only — deciding and emitting effects on join
+  // makes them fire every time someone enters the room.
+  initLocal: (appState) => ({ phase: appState?.phase ?? null }),
+  // Called on each app-state message for this id. The core has already stored
+  // the latest value in state.apps[id]; return only your local slice, chat
+  // lines to append, and effects to emit.
+  onAppState: ({ local, msg }) =>
+    local.phase === msg.phase
+      ? {}
+      : { local: { phase: msg.phase }, effects: [{ type: 'plugin-sound', appId: 'timer', sound: 'ding' }] },
+});
+
+createSpaceStore({ /* … */ plugins: [timer] });
+```
+
+### A note on `settings`
+
+`state.settings` is deliberately opaque (`Record<string, any>`). The store holds
+and replaces it wholesale and never looks inside, so the settings type — and its
+defaults, via `initialSettings` — stay part of *your* wire contract rather than
+this package's. This is the same reasoning that keeps the store free of a server
+and of persistence.
+
+## Test
 
 ```sh
 node --test
 ```
 
-`reduce.test.ts` が純粋 reducer の入出力を assert で検証する（実サーバー・実ブラウザ不要）。
+The reducer tests assert state transitions directly. No server, no browser, no
+sockets, no wall-clock waits.
+
+## Origin
+
+Extracted from [InSession](https://insession.space)'s realtime rooms, where it
+backs synchronized watch parties, shared timers and in-room chat. Generalizing
+it meant removing the product's wire-contract types (settings became opaque),
+moving side effects out of the reducer into descriptors, and pushing all
+app-specific behaviour behind the plugin contract.
 
 ## License
 
