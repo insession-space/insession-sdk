@@ -151,6 +151,15 @@ export interface WatchPartyPayload {
    * no freeze. See point (a) in the module's design notes.
    */
   mixActive?: unknown;
+  /**
+   * `queue-add`: arrival-order stamp. A host that awaits anything before
+   * calling `reduce` (resolving a duration, fetching a title) should capture a
+   * monotonically increasing number *before* that await and pass it here, so
+   * the queue keeps send order even when lookups resolve out of order. Omit it
+   * and `reduce` assigns one at call time, which is only correct for hosts
+   * that never await first.
+   */
+  addSeq?: unknown;
   /** `queue-add`: caps the host resolves from its own space settings. Omitted means "no cap". */
   maxQueueLength?: unknown;
   maxPerUser?: unknown;
@@ -844,7 +853,15 @@ export function createWatchParty(options: CreateWatchPartyOptions = {}): WatchPa
           durationSec,
           addedBy,
           addedByUid: normName(payload?.addedByUid),
-          addSeq: queueSeq,
+          // A host that resolves metadata asynchronously (a duration lookup, a
+          // title fetch) must be able to stamp arrival order *before* it
+          // awaits, then hand that number in here. Assigning it at `reduce`
+          // time instead would record *landing* order: two adds sent back to
+          // back would swap places whenever the second one's lookup resolved
+          // first, and the queue would no longer match what people sent.
+          // Falls back to the internal counter when the host has no async
+          // step to worry about.
+          addSeq: typeof payload?.addSeq === 'number' ? payload.addSeq : queueSeq,
         };
         const queue = insertByAddSeq(s.queue, item);
         let next: WatchPartyState = { ...s, queue, queueSeq };
