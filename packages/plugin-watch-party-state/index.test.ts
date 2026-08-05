@@ -892,3 +892,32 @@ test('queue-add: a host-supplied addSeq preserves send order over landing order'
   assert.ok(noStamp);
   assert.equal(typeof noStamp.state.queue[0].addSeq, 'number');
 });
+
+// A host that persists its queue has its own row ids. Minting our own would
+// drift from theirs — and the built-in counter restarts at zero on reload, so
+// a restored queue would collide with freshly added items.
+test('queue-add: a host-supplied uid is used as the item id', () => {
+  const wp = createWatchParty();
+  const playing = wp.reduce(wp.defaultState(), 'load-video', {
+    videoId: 'zyxwvutsrqp',
+    by: 'alice',
+  })!.state;
+
+  const added = wp.reduce(playing, 'queue-add', {
+    videoId: 'aaaaaaaaaaa',
+    addedBy: 'alice',
+    uid: 'db-row-7f3a',
+  });
+  assert.ok(added);
+  assert.equal(added.state.queue[0].uid, 'db-row-7f3a');
+
+  // ...and that id is what the other queue actions target.
+  const removed = wp.reduce(added.state, 'queue-remove', { uid: 'db-row-7f3a' });
+  assert.ok(removed);
+  assert.equal(removed.state.queue.length, 0);
+
+  // Omitting it keeps the counter-based fallback.
+  const auto = wp.reduce(playing, 'queue-add', { videoId: 'bbbbbbbbbbb', addedBy: 'alice' });
+  assert.ok(auto);
+  assert.match(auto.state.queue[0].uid, /^q\d+$/);
+});

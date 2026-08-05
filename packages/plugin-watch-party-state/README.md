@@ -141,7 +141,7 @@ function loadFromDb(raw: unknown) {
 | `seek` | `{ position, by? }` | Jumps to `position`. An invalid `position` does nothing at all (no broadcast, no persistence) — there's no safe fallback for a garbage seek target. |
 | `video-ended` | `{ videoId, shuffleEnabled?, mixActive? }` | Reported by every client; only honored if `videoId` matches the current item. Advances the queue, defers entirely if `mixActive`, or freezes playback if there's nothing next. See [Deferring to a host-owned "mix" feature](#deferring-to-a-host-owned-mix-feature). |
 | `request-sync` | — | No state change. Emits a `send-to-sender` effect with the current position, for a client that needs to catch up immediately. |
-| `queue-add` | `{ videoId, provider?, mediaUrl?, thumbnail?, title?, durationSec?, addedBy?, addedByUid?, addSeq?, maxQueueLength?, maxPerUser?, maxDurationSec?, shuffleEnabled? }` | Adds to the queue in send order (see `addSeq` below). Auto-plays if nothing is currently playing. |
+| `queue-add` | `{ videoId, provider?, mediaUrl?, thumbnail?, title?, durationSec?, addedBy?, addedByUid?, uid?, addSeq?, maxQueueLength?, maxPerUser?, maxDurationSec?, shuffleEnabled? }` | Adds to the queue in send order (see `addSeq` below). Pass `uid` to give the item your own id (see below). Auto-plays if nothing is currently playing. |
 | `queue-remove` | `{ uid }` | Removes one item by id. No-op if not found. |
 | `queue-clear` | — | Empties the queue. No-op if already empty. |
 | `queue-reorder` | `{ uid, toIndex, shuffleEnabled? }` | Moves an item. Ignored entirely while `shuffleEnabled` (reordering has no meaning when play order isn't array order). |
@@ -309,6 +309,25 @@ all exported. `reduce`'s `action` parameter is typed as `string` rather than
 `WatchPartyAction` on purpose — it sits at a wire boundary where the action
 name is untrusted input, and anything outside the known set falls through to
 `null`.
+
+### Bring your own item ids if you persist the queue
+
+Queue items get a counter-based `uid` by default (`q1`, `q2`, ...). That is only
+safe while the whole queue lives in memory: the counter restarts at zero when
+you reload a stored queue, so restored items and freshly added ones end up
+sharing ids.
+
+If you persist the queue, pass the id you store it under:
+
+```ts
+const uid = crypto.randomUUID(); // or your database's primary key
+
+watchParty.reduce(state, 'queue-add', { videoId, uid });
+// later: reduce(state, 'queue-remove', { uid }) targets the same row
+```
+
+The same `uid` is what `queue-remove` / `queue-reorder` / `queue-play` take, so
+your storage and this state machine stay pointed at the same item.
 
 ### Keeping send order when you resolve metadata first
 
