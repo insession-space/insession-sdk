@@ -857,3 +857,38 @@ test('queue-add: each rejection tells the sender why', () => {
     { type: 'send-to-sender', message: { type: 'queue-rejected', reason: 'invalid-media-url' } },
   ]);
 });
+
+// A host that awaits before calling `reduce` must be able to stamp arrival
+// order itself. Without this, two adds sent back to back swap places whenever
+// the second one's metadata lookup resolves first.
+test('queue-add: a host-supplied addSeq preserves send order over landing order', () => {
+  const wp = createWatchParty();
+  const playing = wp.reduce(wp.defaultState(), 'load-video', {
+    videoId: 'zyxwvutsrqp',
+    by: 'alice',
+  })!.state;
+
+  // "Sent first, landed second" — arrival stamps 1 and 2, applied in the order 2 then 1.
+  const second = wp.reduce(playing, 'queue-add', {
+    videoId: 'bbbbbbbbbbb',
+    addedBy: 'alice',
+    addSeq: 2,
+  });
+  assert.ok(second);
+  const first = wp.reduce(second.state, 'queue-add', {
+    videoId: 'aaaaaaaaaaa',
+    addedBy: 'alice',
+    addSeq: 1,
+  });
+  assert.ok(first);
+  assert.deepEqual(
+    first.state.queue.map((q) => q.videoId),
+    ['aaaaaaaaaaa', 'bbbbbbbbbbb'],
+    'the earlier-sent item slots in ahead of the one that landed first',
+  );
+
+  // Omitting addSeq keeps the previous behaviour (assigned at call time).
+  const noStamp = wp.reduce(playing, 'queue-add', { videoId: 'ccccccccccc', addedBy: 'alice' });
+  assert.ok(noStamp);
+  assert.equal(typeof noStamp.state.queue[0].addSeq, 'number');
+});

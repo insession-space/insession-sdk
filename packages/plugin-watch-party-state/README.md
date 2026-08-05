@@ -141,7 +141,7 @@ function loadFromDb(raw: unknown) {
 | `seek` | `{ position, by? }` | Jumps to `position`. An invalid `position` does nothing at all (no broadcast, no persistence) — there's no safe fallback for a garbage seek target. |
 | `video-ended` | `{ videoId, shuffleEnabled?, mixActive? }` | Reported by every client; only honored if `videoId` matches the current item. Advances the queue, defers entirely if `mixActive`, or freezes playback if there's nothing next. See [Deferring to a host-owned "mix" feature](#deferring-to-a-host-owned-mix-feature). |
 | `request-sync` | — | No state change. Emits a `send-to-sender` effect with the current position, for a client that needs to catch up immediately. |
-| `queue-add` | `{ videoId, provider?, mediaUrl?, thumbnail?, title?, durationSec?, addedBy?, addedByUid?, maxQueueLength?, maxPerUser?, maxDurationSec?, shuffleEnabled? }` | Adds to the queue in send order (see `insertByAddSeq` in the source for why). Auto-plays if nothing is currently playing. |
+| `queue-add` | `{ videoId, provider?, mediaUrl?, thumbnail?, title?, durationSec?, addedBy?, addedByUid?, addSeq?, maxQueueLength?, maxPerUser?, maxDurationSec?, shuffleEnabled? }` | Adds to the queue in send order (see `addSeq` below). Auto-plays if nothing is currently playing. |
 | `queue-remove` | `{ uid }` | Removes one item by id. No-op if not found. |
 | `queue-clear` | — | Empties the queue. No-op if already empty. |
 | `queue-reorder` | `{ uid, toIndex, shuffleEnabled? }` | Moves an item. Ignored entirely while `shuffleEnabled` (reordering has no meaning when play order isn't array order). |
@@ -309,6 +309,29 @@ all exported. `reduce`'s `action` parameter is typed as `string` rather than
 `WatchPartyAction` on purpose — it sits at a wire boundary where the action
 name is untrusted input, and anything outside the known set falls through to
 `null`.
+
+### Keeping send order when you resolve metadata first
+
+If your host awaits anything before calling `reduce` — looking up a duration to
+enforce a cap, fetching a title — two adds sent back to back can land in the
+opposite order, because whichever lookup finishes first gets to `reduce` first.
+The queue would then show them swapped relative to what people actually sent.
+
+Stamp arrival order *before* you await, and hand it in as `addSeq`:
+
+```ts
+// Capture arrival order synchronously, before any await.
+seq += 1;
+const addSeq = seq;
+
+const durationSec = await lookUpDuration(videoId); // lands out of order
+
+const out = watchParty.reduce(state, 'queue-add', { videoId, durationSec, addSeq });
+```
+
+`reduce` slots the item in by `addSeq` rather than appending, so send order
+survives. Omit `addSeq` and it assigns one at call time — fine for a host that
+never awaits first.
 
 ## Test
 
