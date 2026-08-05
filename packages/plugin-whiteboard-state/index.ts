@@ -435,6 +435,19 @@ function applyShapeTypeFields(
 // Normalizes one shape into a safe shape, or `null` if invalid/oversized.
 // Keeps only an allow-listed set of top-level keys (id/type/coords/style +
 // per-type fields); unknown keys are silently dropped.
+// Serialized byte size of a shape, used to cap how large a single shape can get.
+//
+// Uses `TextEncoder` rather than Node's `Buffer.byteLength`: this package is
+// published for browsers as well as servers, and `Buffer` is a Node-only
+// global — reaching for it here would throw `ReferenceError: Buffer is not
+// defined` in a browser the moment a shape is added. Both count UTF-8 bytes
+// and agree on every input, including lone surrogates, so the cap is
+// unchanged.
+const utf8Encoder = new TextEncoder();
+function utf8ByteLength(value: string): number {
+  return utf8Encoder.encode(value).length;
+}
+
 function sanitizeShape(raw: unknown): WhiteboardShape | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
@@ -460,7 +473,7 @@ function sanitizeShape(raw: unknown): WhiteboardShape | null {
   if (r.rotation != null) shape.rotation = clampNum(r.rotation);
   if (r.zIndex != null) shape.zIndex = str(r.zIndex);
   applyShapeTypeFields(shape, type as WhiteboardShapeType, r, false);
-  if (Buffer.byteLength(JSON.stringify(shape), 'utf8') > MAX_SHAPE_BYTES) return null;
+  if (utf8ByteLength(JSON.stringify(shape)) > MAX_SHAPE_BYTES) return null;
   return shape as unknown as WhiteboardShape;
 }
 
@@ -732,7 +745,7 @@ export function createWhiteboardState(options: {
           patch.style = { ...existing.style, ...(patch.style as Record<string, unknown>) };
         }
         const next = { ...existing, ...patch } as WhiteboardShape;
-        if (Buffer.byteLength(JSON.stringify(next), 'utf8') > MAX_SHAPE_BYTES) return null;
+        if (utf8ByteLength(JSON.stringify(next)) > MAX_SHAPE_BYTES) return null;
         const shapes = s.shapes.map((x) => (x.id === id ? next : x));
         return { ...s, shapes, version: s.version + 1 };
       }

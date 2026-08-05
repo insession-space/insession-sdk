@@ -1,0 +1,74 @@
+---
+title: 'ホワイトボード'
+description: '@insession/plugin-whiteboard-state の実動作デモ。共有の自由描画キャンバスと「お絵かき伝言ゲーム」を、その裏で呼ばれたコードを並べて確認できます。'
+---
+
+import WhiteboardDemo from '../../../../components/examples/WhiteboardDemo.tsx';
+
+このサイトの他のパッケージと違い、このパッケージだけは**唯一の外部依存を、内蔵せず注入で解いて
+います。** 投稿された絵の `imageUrl` が信用できるかどうかは、あなた自身のストレージのバケット・
+ドメイン・署名方式を知らないと判断できません — これは SDK 側があらかじめ知りようがないことです。
+そこで `createWhiteboardState` は `isOwnImageUrl` という述語を受け取り、そこから `reduce` /
+`timerDelay` / `onTimer` / `restore` を含む API 全体を組み立てます。「全部受け入れる」という既定値
+は用意していません。述語を渡し忘れたホストが、気づかないまま任意の外部 URL を共有 state に
+受け入れてしまう、という事故を防ぐためです。
+
+下のデモはその述語を自前で用意していて、このページだけが知っている偽のストレージ prefix
+（`https://cdn.example.com/uploads/`）を使っています。パッケージ側からは「述語が true と言った
+URL」以上の意味は一切見えません。
+
+<WhiteboardDemo client:only="react" />
+
+## 試してみること
+
+- **draw** フェーズで **「自前URL」** を選んで絵を出す — prefix に一致するので受理されます。
+  続けて **「他所URL」** で出してみる — `reduce` は `null` を返し、任意の外部画像をそのまま
+  受け入れることなくアクションごと無視します。
+- **free** モードで、strokes と shapes がある状態で **clear** を押す。両方のカウントが同時に
+  ゼロになります — strokes だけ消して shapes を残すような「clear」は、その言葉の意味を静かに
+  裏切ってしまうからです。
+- strokes が無い状態で **消す (erase)** を押す。`null` が返ります — 消すものが無いので、配信する
+  ほどの変化ではない no-op として扱われます。
+- **free** と **relay** を切り替えてみる。切り替えるたびに `reduce` へ `set-mode` も送っていて、
+  結果は常に `null` です。タブの切り替え自体は今はクライアント側の表示上の話であり、`set-mode` を
+  サーバー側で受け入れてしまうと、一見無害なトグルのつもりが進行中の伝言ゲームを誰でも黙って
+  破棄できてしまうからです。
+- プレイヤーを2人以上 join させて **start-game** を押す。フェーズ（`prompt` → `draw` → `guess`
+  → …）と残り時間が、`timerDelay` が経過すると自動で進むのを見る — `state` 自体は、プレイヤーが
+  何かを送ったときと、フェーズの `onTimer` が発火したときにしか変わりません。
+
+## 裏で動いているコード
+
+デモが import しているのは、公開されているパッケージだけです:
+
+```ts
+import { createWhiteboardState } from '@insession/plugin-whiteboard-state';
+
+const whiteboard = createWhiteboardState({
+  isOwnImageUrl: (url) => url.startsWith('https://cdn.example.com/uploads/'),
+});
+
+let state = whiteboard.defaultState();
+
+// クライアントのアクション
+const next = whiteboard.reduce(state, 'submit-drawing', {
+  by: 'Alice',
+  imageUrl: 'https://cdn.example.com/uploads/1.png',
+});
+if (next) state = next;
+
+// relay のフェーズ遷移は自分のタイマーで駆動する
+const delay = whiteboard.timerDelay(state); // フェーズが終わるまでのミリ秒、動作中でなければ null
+if (delay !== null) {
+  setTimeout(() => {
+    state = whiteboard.onTimer(state) ?? state;
+  }, delay);
+}
+```
+
+`reduce` は純関数です — I/O をせず、内部でタイマーも張りません。パッケージ全体で唯一
+「純粋でない」ものは `Date.now()` だけです。スケジューリングが呼ぶ側の責務であることが、同じ
+状態機械をサーバーでも、テストでも、このページでも動かせる理由です。
+
+アクションの全一覧と永続化のヘルパー（`restore`）は
+[パッケージのリファレンス](/ja/packages/plugin-whiteboard-state/)を参照してください。

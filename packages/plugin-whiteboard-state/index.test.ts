@@ -1,5 +1,7 @@
 // Run with: node --test packages/plugin-whiteboard-state
+
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   createWhiteboardState,
@@ -719,4 +721,31 @@ test('two createWhiteboardState() instances do not share isOwnImageUrl behavior'
   const url = `${ownPrefix}img.png`;
   assert.ok(allowOwn.reduce(drawPhase, 'submit-drawing', { by: 'alice', imageUrl: url }));
   assert.equal(rejectAll.reduce(drawPhase, 'submit-drawing', { by: 'alice', imageUrl: url }), null);
+});
+
+// This package is published for browsers as well as servers, so it must not
+// reach for Node-only globals. `Buffer` was used for the shape byte cap at
+// first, which threw `ReferenceError: Buffer is not defined` in a browser the
+// moment a shape was added — a failure no Node-side test could ever catch.
+test('does not depend on Node-only globals (browser-safe)', () => {
+  const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8')
+    // Strip comments first: this file *documents* why `Buffer` is avoided, and
+    // that prose must not trip the check that no code uses it.
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  for (const nodeOnly of ['Buffer.', 'process.env', 'require(', '__dirname']) {
+    assert.ok(
+      !source.includes(nodeOnly),
+      `index.ts must not use the Node-only global \`${nodeOnly}\` — this package runs in browsers too`,
+    );
+  }
+});
+
+// The byte cap must keep counting UTF-8 bytes exactly as before the switch
+// from Buffer.byteLength to TextEncoder.
+test('shape byte cap counts UTF-8 bytes, including multi-byte and lone surrogates', () => {
+  const enc = new TextEncoder();
+  for (const s of ['', 'abc', 'あいうえお', '\u{1F3A8}', '\uD800', 'a\uD800b', '中'.repeat(50)]) {
+    assert.equal(enc.encode(s).length, Buffer.byteLength(s, 'utf8'));
+  }
 });
