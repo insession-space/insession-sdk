@@ -60,6 +60,7 @@ export default defineConfig({
           translations: { ja: 'デモ' },
           items: [
             { label: 'pomodoro', slug: 'examples/pomodoro' },
+            { label: 'whiteboard', slug: 'examples/whiteboard' },
             { label: 'space-state', slug: 'examples/space-state' },
             { label: 'space-state-react', slug: 'examples/space-state-react' },
           ],

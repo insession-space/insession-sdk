@@ -1,0 +1,81 @@
+---
+title: 'Whiteboard'
+description: A live demo of @insession/plugin-whiteboard-state — a shared free-draw canvas plus a "drawing telephone" relay game, with every call it made shown next to them.
+---
+
+import WhiteboardDemo from '../../../components/examples/WhiteboardDemo.tsx';
+
+Unlike the other packages on this site, this one has exactly **one external
+dependency, and it's solved by injection rather than baked in.** Deciding
+whether a submitted drawing's `imageUrl` is trustworthy means knowing your
+own storage's bucket, domain, or signing scheme — something this SDK can't
+know in advance. So `createWhiteboardState` takes an `isOwnImageUrl`
+predicate and builds the rest of the API (`reduce`, `timerDelay`, `onTimer`,
+`restore`) around it. There's no "accept everything" default: a host that
+forgets to pass a predicate would otherwise silently let arbitrary external
+URLs into shared state.
+
+The demo below wires up that predicate itself, using a fake storage prefix
+(`https://cdn.example.com/uploads/`) that only this page knows about — the
+package never sees it as anything but "the predicate said yes."
+
+<WhiteboardDemo client:only="react" />
+
+## What to try
+
+- In **draw** phase, submit a drawing with **"自前URL" (own URL)** — it's
+  accepted, because `isOwnImageUrl` recognizes the prefix. Then submit with
+  **"他所URL" (someone else's URL)** — `reduce` returns `null`, dropping the
+  action entirely rather than accepting an arbitrary external image.
+- In **free** mode, press **clear** with strokes and shapes on the board.
+  Both counts go to zero together — a "clear the board" that only cleared
+  strokes would leave shapes behind, which would violate what "clear" means.
+- Press **消す (erase)** with no strokes on the board. It returns `null` —
+  there's nothing to remove, so it's a no-op rather than a broadcast-worthy
+  change.
+- Switch between **free** and **relay**. Each switch also calls `reduce`
+  with `set-mode`, and it's always `null`: tab switching is a client-side
+  display concern now, and accepting `set-mode` server-side would let anyone
+  silently discard an in-progress relay game by what looks like a harmless
+  toggle.
+- Join at least two players and press **start-game**. Watch the phase
+  (`prompt` → `draw` → `guess` → …) and the countdown advance on their own
+  once `timerDelay` elapses — `state` itself only changes when a player acts
+  or a phase's `onTimer` fires.
+
+## The code behind it
+
+The demo imports the published package and nothing else:
+
+```ts
+import { createWhiteboardState } from '@insession/plugin-whiteboard-state';
+
+const whiteboard = createWhiteboardState({
+  isOwnImageUrl: (url) => url.startsWith('https://cdn.example.com/uploads/'),
+});
+
+let state = whiteboard.defaultState();
+
+// A client action
+const next = whiteboard.reduce(state, 'submit-drawing', {
+  by: 'Alice',
+  imageUrl: 'https://cdn.example.com/uploads/1.png',
+});
+if (next) state = next;
+
+// Relay phase transitions are driven by your own timer
+const delay = whiteboard.timerDelay(state); // ms until the phase ends, or null
+if (delay !== null) {
+  setTimeout(() => {
+    state = whiteboard.onTimer(state) ?? state;
+  }, delay);
+}
+```
+
+`reduce` is a pure function — no I/O, no timers started inside it, and the
+only "impure" thing anywhere in the package is `Date.now()`. Scheduling is
+yours, which is what lets the same state machine run on a server, in a test,
+or in this page.
+
+See the [package reference](/packages/plugin-whiteboard-state/) for the full
+action list and the persistence helpers (`restore`).
