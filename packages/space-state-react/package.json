@@ -1,6 +1,6 @@
 {
   "name": "@insession/space-state-react",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "@insession/space-state を React の useSyncExternalStore に繋ぐ薄いラッパー",
   "//": "元は insession-app の packages/space-state-react にあり、.ts ソースのまま消費されていた。別リポジトリ化に伴い dist（.js + .d.ts）を配布する形にした。ロジックは一切持たない（1関数・約10行）。",
   "type": "module",

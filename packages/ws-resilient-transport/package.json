@@ -1,6 +1,6 @@
 {
   "name": "@insession/ws-resilient-transport",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A tiny, dependency-free WebSocket transport that reconnects the way a production deploy needs it to: fast reconnect on service restart, jittered exponential backoff otherwise, and terminal close codes that stop reconnection.",
   "//": "元は insession-app の packages/ws-resilient-transport にあり、.ts ソースのまま消費されていた（Vite / Node のネイティブ型ストリップが解決するため、モノレポ内ではビルド不要だった）。別リポジトリ化に伴い dist（.js + .d.ts）を配布する形にした。Node は node_modules 配下の .ts を型ストリップしないため、サーバー側の消費者にとってもビルド済みの方が素直（インストールした依存の中身までは型ストリップの対象にならない）。",
   "type": "module",
