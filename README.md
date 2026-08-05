@@ -79,6 +79,28 @@ Version PR が作られ、それをマージすると `release.yml` が npm publ
    未登録だと OIDC トークンが認証情報に交換されず、`PUT` が `E404 Not Found` で拒否される
    （npm は権限不足を 403 ではなく 404 で返す。パッケージの存在を隠すため）。
 
+   > ### ⚠ 新規パッケージは、この登録を先に行えない
+   >
+   > **Trusted Publisher の登録画面はパッケージページ配下にあるため、まだ npm に無いパッケージには登録できない。**
+   > 新規パッケージだけは順序が逆になる:
+   >
+   > 1. 手元から初回版を publish してパッケージを作る（`npm login` → `npm publish --otp=<6桁>`）
+   > 2. できたパッケージページで Trusted Publisher を登録する
+   > 3. 以降の版は CI（OIDC）から provenance 付きで出る
+   >
+   > **初回版だけは provenance が付かない。**これは避けられない
+   > （`@insession/ws-resilient-transport` も `0.1.0` だけ provenance が無く、`0.2.0` 以降に付いている）。
+   >
+   > 順序を間違えると Version PR をマージした瞬間に release が `E404` で落ちる。ただし壊れるものは無く、
+   > 採番のコミットが `main` に載るだけなので、手動 publish するか run を再実行すれば復旧する。
+   >
+   > **切り分け**: `E404` は未ログイン・権限不足・Trusted Publisher 未登録のどれでも同じ形で出る。
+   > `npm whoami --registry https://registry.npmjs.org/` が `401` なら単に未ログイン。
+   >
+   > **publish 後の確認に `npm view` を使わないこと** — 開発機の `~/.npmrc` が読み取りを社内プロキシへ
+   > 向けている場合、出たばかりのパッケージが `404` に見える。公開レジストリを直接見る:
+   > `curl -s https://registry.npmjs.org/@insession%2F<名前> | jq '.["dist-tags"]'`
+
    > `https://www.npmjs.com/package/@insession/<パッケージ名>/access` → Trusted Publisher
    >
    > | 項目 | 値 |
