@@ -34,6 +34,50 @@ npm のパッケージページにそのまま出る配布物なので、どの�
 
 トップページ（`src/content/docs/index.mdx`）と Getting started は手書き。
 
+## 日本語版（`/ja/`）
+
+英語が root locale（`/`）、日本語が `/ja/`。**英語側の URL は変えないこと** — 既に公開済みで、
+外部からリンクされうる。
+
+| 言語 | URL | 置き場所 | 作り方 |
+| --- | --- | --- | --- |
+| 英語 | `/` | `src/content/docs/` | トップと Getting started は手書き、`packages/*` は README から**生成** |
+| 日本語 | `/ja/` | `src/content/docs/ja/` | **すべて手書き** |
+
+日本語ページを `packages/*/README.ja.md` から生成しない理由は、**README が npm の配布物**
+だから。npm は世界向けの窓口なので英語1本に保ち、`files` にも手を入れない。日本語は
+「サイトの都合」なのでサイト側（`apps/docs`）に閉じ込めてある。
+
+### ⚠ この非対称が唯一の弱点 — 同期ずれは機械で検知する
+
+英語は生成・日本語は手書きなので、**README を直すと英語ページだけ更新され、日本語ページは
+黙って古くなる**。ビルドは通り続けるので、検査しない限り誰も気づけない。
+
+`scripts/check-translation-sync.mjs` が、英語 README の内容ハッシュを `translations.lock.json`
+と突き合わせて警告する。`sync` に組み込んであるので `dev` / `build` / `typecheck` のたびに走る。
+
+```
+⚠ 日本語ページが英語 README から取り残されている可能性があります:
+  - space-state  7b8037d6aa405272 → 620a33e6c8ebaa55
+```
+
+**警告であってビルド失敗にはしない。** ここで落とすと、英語の修正が日本語の翻訳待ちで
+ブロックされる。英語が正・日本語は追随、という関係を壊さないため。
+
+翻訳を追随させたら lock を更新する:
+
+```bash
+pnpm --filter @insession/docs run sync:accept
+```
+
+`translations.lock.json` はこのスクリプトが管理する。**手で編集しない。**
+
+### 日本語ページを足すとき
+
+- 各日本語ページの冒頭に「**英語版が正**」の `:::note` を置く（食い違ったときの拠り所を明示するため）
+- sidebar のラベルは `astro.config.mjs` の `translations: { ja: '…' }` で訳す
+- **コード例・API 名・オプション名は訳さない**。訳すと英語版と突き合わせられなくなる
+
 ## ⚠ 色は design-system の「値」をコピーしている（依存はしていない）
 
 `src/styles/tokens.css` が `@insession/design-system` のトークンを写経して Starlight の

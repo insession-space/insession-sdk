@@ -8,7 +8,8 @@
   "//sync": "パッケージページは packages/*/README.md から生成する（単一ソース）。dev/build/typecheck のいずれでも先に走らせないと、生成物が無い状態で Astro が動いて sidebar のリンク切れになる。",
   "//typecheck": "astro check をこの名前で持つのは意図的。ルートの `pnpm typecheck`(= pnpm -r run typecheck)が自動で拾い、CI の単一ソースである `pnpm verify` に何も足さずに含まれるため。",
   "scripts": {
-    "sync": "node scripts/sync-package-docs.mjs",
+    "sync": "node scripts/sync-package-docs.mjs && node scripts/check-translation-sync.mjs",
+    "sync:accept": "node scripts/check-translation-sync.mjs --write",
     "predev": "pnpm sync",
     "dev": "astro dev",
     "prebuild": "pnpm sync",

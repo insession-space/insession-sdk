@@ -1,0 +1,106 @@
+---
+title: '@insession SDK'
+description: リアルタイムな共有ルームを作るための、依存ゼロの部品。デプロイを生き延びる WebSocket トランスポートと、transport 非依存の状態 store。
+template: splash
+hero:
+  title: 配管を書かずに、リアルタイムな部屋を作る
+  tagline: 本番稼働中のリアルタイムアプリから切り出した、小さな依存ゼロのパッケージ3つ。デプロイを生き延びる WebSocket トランスポートと、サーバーなしでテストできる状態 store。
+  actions:
+    - text: はじめかた
+      link: /ja/getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: GitHub で見る
+      link: https://github.com/insession-space/insession-sdk
+      icon: external
+      variant: minimal
+---
+
+<div class="install-line">
+  <span class="prompt">$</span>
+  <span>npm install @insession/space-state @insession/ws-resilient-transport</span>
+</div>
+
+## パッケージ
+
+<div class="pkg-grid">
+  <div class="pkg-card">
+    <h3>@insession/ws-resilient-transport</h3>
+    <p>
+      本番デプロイの都合に合わせて再接続する WebSocket トランスポート。サービス再起動時は即座に、
+      それ以外はジッター付き指数バックオフで、terminal な close code なら再接続を完全に止める。
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">依存ゼロ</span>
+      <span class="pkg-tag">約130行</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/ja/packages/ws-resilient-transport/">ドキュメント</a>
+      <a href="https://www.npmjs.com/package/@insession/ws-resilient-transport">npm</a>
+    </div>
+  </div>
+
+  <div class="pkg-card">
+    <h3>@insession/space-state</h3>
+    <p>
+      共有ルームの状態（メンバー・チャット・プレゼンス・プラグイン）を持つ store。受信は純粋
+      reducer で畳み込み、副作用は実行せず記述子として返すだけ。
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">依存ゼロ</span>
+      <span class="pkg-tag">純粋 reducer</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/ja/packages/space-state/">ドキュメント</a>
+      <a href="https://www.npmjs.com/package/@insession/space-state">npm</a>
+    </div>
+  </div>
+
+  <div class="pkg-card">
+    <h3>@insession/space-state-react</h3>
+    <p>
+      <code>space-state</code> の React バインディング。<code>useSyncExternalStore</code> を包む
+      フック1つ・約10行で、ロジックは一切持たない。
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag">フック1つ</span>
+      <span class="pkg-tag">react は peer</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/ja/packages/space-state-react/">ドキュメント</a>
+      <a href="https://www.npmjs.com/package/@insession/space-state-react">npm</a>
+    </div>
+  </div>
+</div>
+
+<p class="dep-note">
+  3つの間にある依存は <code>space-state-react</code> → <code>space-state</code> の1本だけ。
+  <code>ws-resilient-transport</code> は独立しています — バイトを運ぶことと状態を持つことを意図的に
+  切り離してあるので、どちらか一方だけを採用できます。
+</p>
+
+## なぜこれを使うのか
+
+<div class="selling-grid">
+  <div>
+    <h3>下に何も入らない</h3>
+    <p>
+      トランスポートと store のランタイム依存はゼロ。フレームワークもソケットライブラリも DOM も
+      要りません。これは偶然ではなく、このパッケージの狙いそのものです。
+    </p>
+  </div>
+  <div>
+    <h3>サーバーなしでテストできる</h3>
+    <p>
+      store はただのオブジェクトを受け取り、ただの記述子を返します。だから状態遷移まるごとを
+      <code>node --test</code> のプロセス内で assert できます — ブラウザもソケットも実時間の待ちも不要。
+    </p>
+  </div>
+  <div>
+    <h3>実際のデプロイが形を決めた</h3>
+    <p>
+      再接続の挙動は「デプロイのたびに全クライアントが同時に切れる」という現実から来ています。
+      サービス再起動時は高速に、ジッターで殺到を避け、サーバーが二度と受け付けないと言ったら止まる。
+    </p>
+  </div>
+</div>
