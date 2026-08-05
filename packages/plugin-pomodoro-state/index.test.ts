@@ -1,4 +1,4 @@
-// Run with: node --test packages/pomodoro-state
+// Run with: node --test packages/plugin-pomodoro-state
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {

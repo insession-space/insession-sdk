@@ -11,7 +11,7 @@ app. They are independent enough that you can adopt one and ignore the rest.
 | [`@insession/ws-resilient-transport`](/packages/ws-resilient-transport/) | Keeps a WebSocket connected across deploys: fast reconnect on service restart, jittered backoff otherwise, terminal close codes that stop retrying. | none |
 | [`@insession/space-state`](/packages/space-state/) | Holds the state of a shared room — members, chat, presence, typing, plugins — as a pure reducer over inbound messages. | none |
 | [`@insession/space-state-react`](/packages/space-state-react/) | Binds the store to React via `useSyncExternalStore`. One hook. | `@insession/space-state` (+ `react` as a peer) |
-| [`@insession/pomodoro-state`](/packages/pomodoro-state/) | A server-authoritative Pomodoro timer state machine: pure `reduce`, plus `restore`/`persistState` for the storage boundary. | none |
+| [`@insession/plugin-pomodoro-state`](/packages/plugin-pomodoro-state/) | A server-authoritative Pomodoro timer state machine: pure `reduce`, plus `restore`/`persistState` for the storage boundary. | none |
 
 ## How they fit together
 
@@ -45,7 +45,7 @@ store stays testable with no server and no browser at all.
 - **Both, in a React app.** Take `ws-resilient-transport`, `space-state`, and
   `space-state-react`.
 - **You need a shared timer people can start, pause and skip together.** Take
-  `pomodoro-state` alone. It is a state machine only — bring your own transport
+  `plugin-pomodoro-state` alone. It is a state machine only — bring your own transport
   and storage.
 
 ## Install

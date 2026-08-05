@@ -18,9 +18,9 @@ InSession 本体（[`insession-app`](https://github.com/insession-space/insessio
 | [`@insession/ws-resilient-transport`](./packages/ws-resilient-transport) | 本番デプロイの都合に合わせて再接続する WebSocket トランスポート。サービス再起動時の高速再接続とジッター付き指数バックオフを両立する。依存ゼロ |
 | [`@insession/space-state`](./packages/space-state) | transport・フレームワーク非依存のスペース状態 store。受信は純粋 reducer、副作用は記述子で返すだけ。依存ゼロ |
 | [`@insession/space-state-react`](./packages/space-state-react) | 上を React の `useSyncExternalStore` に繋ぐ薄いラッパー |
-| [`@insession/pomodoro-state`](./packages/pomodoro-state) | 依存ゼロのポモドーロタイマー状態機械。server-authoritative で `reduce` は純関数 |
+| [`@insession/plugin-pomodoro-state`](./packages/plugin-pomodoro-state) | 依存ゼロのポモドーロタイマー状態機械。server-authoritative で `reduce` は純関数 |
 
-plugin の **server 面**（UI・i18n・design-system への依存を持たない純粋な状態機械）はこのリポジトリへ移設する方針で、`pomodoro-state` はその第一弾。**UI を持つ部分**（client 面。`pomodoro-kit` 等）はプロダクト判断を抱えるため `insession-app` に残す
+plugin の **server 面**（UI・i18n・design-system への依存を持たない純粋な状態機械）はこのリポジトリへ移設する方針で、`plugin-pomodoro-state` はその第一弾。**UI を持つ部分**（client 面。`pomodoro-kit` 等）はプロダクト判断を抱えるため `insession-app` に残す
 （何をここへ入れてよいかの判断は `CLAUDE.md` の「入れるもの / 入れないもの」を参照）。
 
 ## なぜ InSession 本体から分かれているか
@@ -42,7 +42,7 @@ insession-sdk/
 │   ├── ws-resilient-transport/   # @insession/ws-resilient-transport
 │   ├── space-state/              # @insession/space-state
 │   ├── space-state-react/        # @insession/space-state-react
-│   └── pomodoro-state/           # @insession/pomodoro-state
+│   └── plugin-pomodoro-state/           # @insession/plugin-pomodoro-state
 ├── .changeset/
 ├── CLAUDE.md        # 作業規約（開発・changeset・リリース・置き場所の判断）
 └── .github/workflows/
