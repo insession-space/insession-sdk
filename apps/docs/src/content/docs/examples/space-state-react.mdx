@@ -1,0 +1,46 @@
+---
+title: 'React binding'
+description: A live demo of @insession/space-state-react — one hook over useSyncExternalStore, with the render count exposed so you can see it bail out.
+---
+
+import SpaceStateReactDemo from '../../../components/examples/SpaceStateReactDemo.tsx';
+
+This package is one function, about ten lines, with no logic of its own. Showing
+you the source proves nothing — so this demo shows the **render count** instead.
+Press `typing` twice for the same person: the second one does not re-render,
+because the store returns the same state reference and `useSyncExternalStore`
+bails out.
+
+<SpaceStateReactDemo client:only="react" />
+
+## What to try
+
+- Press **chat** a few times. Every message is a new state, so `<ChatPanel />`
+  re-renders each time and the count climbs with the received counter.
+- Press **typing (same person)** repeatedly. The first press re-renders (the
+  name is added to `typingUsers`); every press after that leaves the count
+  alone while `messages received` keeps going up. That gap is the whole point.
+- Press **chat** after a few `typing` presses. The indicator clears and the
+  panel re-renders — a real change still gets through.
+
+## The code behind it
+
+```tsx
+import { createSpaceStore } from '@insession/space-state';
+import { useSpaceState } from '@insession/space-state-react';
+
+const store = createSpaceStore({ selfName: 'you', t: (k) => k, getPresence: () => 'active' });
+
+function ChatPanel() {
+  const state = useSpaceState(store);
+  return <ul>{state.chatLines.map((line) => <li key={line.id}>{line.text}</li>)}</ul>;
+}
+```
+
+That is the entire integration. The bail-out behaviour is not implemented here —
+it comes from the store honouring the `useSyncExternalStore` contract
+(`getState()` returns the same reference while nothing has changed), and this
+package doing nothing to get in the way.
+
+See the [package reference](/packages/space-state-react/) for the signature and
+the note on why no `getServerSnapshot` is passed.

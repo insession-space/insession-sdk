@@ -7,24 +7,35 @@
   "type": "module",
   "//sync": "パッケージページは packages/*/README.md から生成する（単一ソース）。dev/build/typecheck のいずれでも先に走らせないと、生成物が無い状態で Astro が動いて sidebar のリンク切れになる。",
   "//typecheck": "astro check をこの名前で持つのは意図的。ルートの `pnpm typecheck`(= pnpm -r run typecheck)が自動で拾い、CI の単一ソースである `pnpm verify` に何も足さずに含まれるため。",
+  "//build:deps": "⚠ デモページ(/examples/*)が @insession/* を実際に import するので、Astro を動かす前に依存パッケージの dist が要る。CI は `pnpm verify`(= typecheck を含む)を `pnpm build` より先に回すため、これが無いと astro check が dist を解決できずに落ちる。`^...` は「そのパッケージの依存だけ(自身は含まない)」を選ぶ pnpm のフィルタ。",
   "scripts": {
     "sync": "node scripts/sync-package-docs.mjs && node scripts/check-translation-sync.mjs",
     "sync:accept": "node scripts/check-translation-sync.mjs --write",
-    "predev": "pnpm sync",
+    "build:deps": "pnpm --filter \"@insession/docs^...\" run build",
+    "predev": "pnpm sync && pnpm build:deps",
     "dev": "astro dev",
-    "prebuild": "pnpm sync",
+    "prebuild": "pnpm sync && pnpm build:deps",
     "build": "astro build",
     "preview": "astro preview",
-    "pretypecheck": "pnpm sync",
+    "pretypecheck": "pnpm sync && pnpm build:deps",
     "typecheck": "astro check"
   },
+  "//@astrojs/react": "⚠ 4 系に留めること。Astro 5(Vite 6)に対して 6 系(Vite 7 / rolldown 前提)を入れると pnpm dev のハイドレーションが builtin:vite-react-refresh-wrapper の `Missing field moduleType` で落ちる。**pnpm build は通り続ける**ので dev だけが壊れて気づきにくい。詳細は README の同名の節。",
   "dependencies": {
+    "@astrojs/react": "^4.4.2",
     "@astrojs/starlight": "^0.36.0",
+    "@insession/plugin-pomodoro-state": "workspace:*",
+    "@insession/space-state": "workspace:*",
+    "@insession/space-state-react": "workspace:*",
     "astro": "^5.14.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "sharp": "^0.34.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "typescript": "^5.7.0"
   }
 }

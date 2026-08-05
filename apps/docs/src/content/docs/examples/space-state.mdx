@@ -1,0 +1,59 @@
+---
+title: 'Space state'
+description: A live demo of @insession/space-state — feed inbound messages into the store and watch the effects come back as descriptors instead of firing.
+---
+
+import SpaceStateDemo from '../../../components/examples/SpaceStateDemo.tsx';
+
+The hardest thing to convey about this store in prose is that **effects are
+returned, not performed.** Below, `notify-chat` and `typing-timer` land in the
+right-hand pane as plain data — nothing plays a sound, nothing asks for
+notification permission, nothing starts a timer. What any of it means is your
+call.
+
+<SpaceStateDemo client:only="react" />
+
+## What to try
+
+- Press **member-joined**. A log line lands in `chatLines` and two effects come
+  back: `sound` and `notify-join`. The log text is `<log.joined>` because this
+  demo passes a `t` that just marks the key — the store never picks wording
+  itself.
+- Press **typing**, then press it again. The second one returns the **same state
+  reference**, so a subscriber would not re-render. The `typing-timer` effect
+  still comes back both times, because the timer has to be re-armed even when
+  the display did not change.
+- Press **chat** while someone is typing. You get `typing-timer-clear` alongside
+  `sound` and `notify-chat` — removing the indicator and cancelling the pending
+  3-second timer are one atomic step.
+
+## The code behind it
+
+```ts
+import { createSpaceStore } from '@insession/space-state';
+
+const store = createSpaceStore({
+  selfName: 'you',
+  t: (key) => key,              // any resolver; the identity function is fine in tests
+  getPresence: () => 'active',
+});
+
+// You decide what an effect means.
+store.onEffect((effect) => {
+  if (effect.type === 'sound') playSound(effect.sound);
+  if (effect.type === 'notify-chat') notify(`${effect.name}: ${effect.text}`);
+});
+
+// Inbound messages fold through a pure reducer.
+store.receive({ type: 'chat', name: 'ren', text: 'hello' });
+
+store.getState().chatLines.at(-1);
+```
+
+Because `receive` takes plain objects and effects are plain descriptors, a full
+state transition is assertable under `node --test` — no server, no browser, no
+sockets. That is the same property this page relies on to run entirely in your
+browser.
+
+See the [package reference](/packages/space-state/) for the full effect union,
+the store methods, and the plugin contract.

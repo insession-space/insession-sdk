@@ -1,0 +1,259 @@
+/* デモページ(/examples/*)の見た目。
+ *
+ * 色は tokens.css が定義する --ds-* をそのまま使う（ここで新しい色を作らない）。
+ * デモは3枚とも「操作 / 状態 / 実行されたコード」の同じ骨格で組んであるので、
+ * スタイルも1枚で共有する。
+ */
+
+.demo {
+  border: 1px solid var(--ds-border);
+  border-radius: 0.9rem;
+  background: var(--ds-bg-elevated);
+  overflow: hidden;
+  margin-top: 1.5rem;
+}
+
+.demo-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.9rem;
+  padding: 0.7rem 1.1rem;
+  border-bottom: 1px solid var(--ds-border);
+  background: var(--ds-surface);
+  font-family: var(--__sl-font-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+}
+
+.demo-bar .demo-api {
+  margin-left: auto;
+  color: var(--ds-text-faint);
+}
+
+/* 1px の gap を背景色で見せる罫線にしている（border を各ペインに付けると角で二重になる）。 */
+.demo-body {
+  display: grid;
+  gap: 1px;
+  background: var(--ds-border);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 52rem) {
+  .demo-body {
+    grid-template-columns: 1.05fr 1fr;
+  }
+}
+
+.demo-pane {
+  background: var(--ds-bg-elevated);
+  padding: 1.15rem;
+  /* grid の子は既定で min-width:auto のため、中の <pre> が伸びると列が押し広げられる。 */
+  min-width: 0;
+}
+
+.demo-label {
+  font-family: var(--__sl-font-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ds-text-faint);
+  margin: 0 0 0.8rem;
+}
+
+.demo-label + .demo-label,
+.demo-pane > * + .demo-label {
+  margin-top: 1.25rem;
+}
+
+/* ── 操作 ─────────────────────────────────────────────── */
+
+.demo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.demo-btn {
+  font: inherit;
+  font-family: var(--__sl-font-mono, ui-monospace, monospace);
+  font-size: 0.87rem;
+  color: var(--ds-text);
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border-strong);
+  border-radius: 0.5rem;
+  padding: 0.42rem 0.8rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.demo-btn:hover:not(:disabled) {
+  background: var(--ds-surface-hover);
+  border-color: var(--ds-accent);
+}
+
+.demo-btn:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
+}
+
+/* primary は accent の「塗り」。文字用の accent-soft と役割を混ぜない（tokens.css 冒頭参照）。 */
+.demo-btn[data-primary] {
+  background: var(--ds-accent);
+  border-color: var(--ds-accent);
+  color: var(--ds-on-accent, #fff);
+}
+
+.demo-btn[data-primary]:hover:not(:disabled) {
+  background: color-mix(in srgb, #000 12%, var(--ds-accent));
+  border-color: color-mix(in srgb, #000 12%, var(--ds-accent));
+}
+
+.demo-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.demo-field {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  font-size: 0.82rem;
+  color: var(--ds-text-dim);
+}
+
+.demo-field input {
+  font: inherit;
+  font-family: var(--__sl-font-mono, ui-monospace, monospace);
+  width: 4.5rem;
+  padding: 0.3rem 0.5rem;
+  color: var(--ds-text);
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border-strong);
+  border-radius: 0.4rem;
+}
+
+.demo-field input:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 1px;
+}
+
+/* ── タイマー ─────────────────────────────────────────── */
+
+.demo-clock {
+  font-family: var(--__sl-font-mono, ui-monospace, monospace);
+  font-size: clamp(2.6rem, 8vw, 3.6rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin: 0 0 0.6rem;
+  color: var(--ds-text);
+}
+
+.demo-clock[data-phase="break"] {
+  color: var(--ds-decor-1);
+}
+
+.demo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1.1rem;
+}
+
+.demo-chip {
+  font-family: var(--__sl-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  padding: 0.14rem 0.55rem;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: 999px;
+  color: var(--ds-text-dim);
+}
+
+.demo-chip[data-on] {
+  color: var(--ds-decor-1);
+  border-color: color-mix(in srgb, var(--ds-decor-1) 40%, transparent);
+}
+
+/* ── 状態 / トレース ──────────────────────────────────── */
+
+.demo-readout {
+  font-family: var(--__sl-font-mono, ui-monospace, monospace);
+  font-size: 0.79rem;
+  line-height: 1.65;
+  margin: 0;
+  white-space: pre;
+  overflow-x: auto;
+  color: var(--ds-text-dim);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.demo-readout .k {
+  color: var(--ds-text-faint);
+}
+
+.demo-readout .v {
+  color: var(--ds-text);
+}
+
+.demo-readout .n {
+  color: var(--ds-accent-2);
+}
+
+.demo-trace {
+  font-family: var(--__sl-font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.demo-trace li {
+  padding: 0.28rem 0;
+  border-bottom: 1px dashed var(--ds-border);
+  color: var(--ds-text-dim);
+  overflow-wrap: anywhere;
+}
+
+.demo-trace li:last-child {
+  border-bottom: 0;
+}
+
+.demo-trace .call {
+  color: var(--ds-text);
+}
+
+.demo-trace .ret {
+  color: var(--ds-text-faint);
+}
+
+/* no-op（reduce が null を返した / 再レンダリングされなかった）を目立たせる。 */
+.demo-trace li[data-noop] .ret {
+  color: var(--ds-accent-soft);
+}
+
+/* effect は複数行を1要素にまとめて入れる（Trace.tsx 参照）ので、改行を活かす。 */
+.demo-trace .eff {
+  display: block;
+  white-space: pre-wrap;
+  color: var(--ds-decor-1);
+}
+
+.demo-trace .empty {
+  color: var(--ds-text-faint);
+  font-style: italic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-btn {
+    transition: none;
+  }
+}

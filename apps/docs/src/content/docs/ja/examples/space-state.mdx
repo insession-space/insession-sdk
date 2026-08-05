@@ -1,0 +1,54 @@
+---
+title: 'スペースの状態'
+description: '@insession/space-state の実動作デモ。受信メッセージを store に流し込むと、副作用が発火せずに記述子として返ってくる様子を確認できます。'
+---
+
+import SpaceStateDemo from '../../../../components/examples/SpaceStateDemo.tsx';
+
+この store について文章で伝えるのがいちばん難しいのが、**副作用は返されるだけで実行されない**
+という点です。下のデモでは `notify-chat` や `typing-timer` が右のペインにただのデータとして
+届きます — 音は鳴らず、通知の許可も求められず、タイマーも張られません。それが何を意味するかは
+あなたが決めます。
+
+<SpaceStateDemo client:only="react" />
+
+## 試してみること
+
+- **member-joined** を押す。`chatLines` にログ行が積まれ、`sound` と `notify-join` の2つの
+  effect が返ります。ログの文言が `<log.joined>` なのは、このデモがキーに印を付けるだけの `t` を
+  渡しているからです — store は文言を自分で決めません。
+- **typing** を押し、もう一度押す。2回目は **state が同一参照のまま**返るので、購読側は再レンダ
+  リングされません。それでも `typing-timer` の effect は毎回返ります — 表示が変わらなくても
+  タイマーは張り直す必要があるからです。
+- 誰かが入力中の状態で **chat** を押す。`sound` と `notify-chat` に加えて `typing-timer-clear` が
+  返ります — 表示を消すことと、残っている3秒タイマーを止めることは1つの操作だからです。
+
+## 裏で動いているコード
+
+```ts
+import { createSpaceStore } from '@insession/space-state';
+
+const store = createSpaceStore({
+  selfName: 'you',
+  t: (key) => key,              // 任意の解決関数。テストなら恒等関数でよい
+  getPresence: () => 'active',
+});
+
+// effect が何を意味するかは、あなたが決める。
+store.onEffect((effect) => {
+  if (effect.type === 'sound') playSound(effect.sound);
+  if (effect.type === 'notify-chat') notify(`${effect.name}: ${effect.text}`);
+});
+
+// 受信メッセージは純粋 reducer で畳み込まれる。
+store.receive({ type: 'chat', name: 'ren', text: 'hello' });
+
+store.getState().chatLines.at(-1);
+```
+
+`receive` がただのオブジェクトを取り、effect がただの記述子であるおかげで、状態遷移まるごとを
+`node --test` で assert できます — サーバーもブラウザもソケットも不要です。このページがブラウザ
+の中だけで完結して動くのも、まったく同じ性質によります。
+
+effect の全 union、store のメソッド、plugin の契約は
+[パッケージのリファレンス](/ja/packages/space-state/)を参照してください。

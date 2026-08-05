@@ -1,0 +1,53 @@
+---
+title: 'Pomodoro timer'
+description: A live demo of @insession/plugin-pomodoro-state — drive the state machine and watch the phase transitions, with every call it made shown next to them.
+---
+
+import PomodoroDemo from '../../../components/examples/PomodoroDemo.tsx';
+
+The point of this package is that **a running timer carries no seconds.** While
+running, the state holds `endsAt` — a wall-clock epoch ms — and the client draws
+the countdown from it. So the clock below ticks every second, but `state` only
+changes when you press something or when a phase actually expires.
+
+<PomodoroDemo client:only="react" />
+
+## What to try
+
+- Press **start**, then **start** again. The second one returns `null` — `reduce`
+  treats an already-running timer as a no-op rather than throwing or restarting.
+- Press **pause** and watch `endsAt` become `null` while `remaining` freezes at
+  whatever was left.
+- Press **skip** a few times. The phase alternates, but `cycles` stays put —
+  only a phase that expires on its own counts as a completed cycle.
+- Set **work** to `0` and send it. It clamps to 1 minute rather than falling
+  back to the current config, because `0` is a value that converts to a number.
+  Try `999` too: it clamps to 120.
+- Try **configure** while the timer is running. It returns `null` — changing a
+  phase length mid-phase has ambiguous semantics, so only a stopped timer
+  accepts it.
+
+## The code behind it
+
+The demo imports the published package and nothing else:
+
+```ts
+import { defaultState, onTimer, reduce, timerDelay } from '@insession/plugin-pomodoro-state';
+
+let state = defaultState();
+
+// A button press
+const next = reduce(state, 'start');
+if (next) state = next;
+
+// Phase transitions are driven by your own timer
+const delay = timerDelay(state); // ms until the phase ends, or null
+if (delay !== null) setTimeout(() => { state = onTimer(state); }, delay);
+```
+
+`reduce` is a pure function — no I/O, no timers started inside it. Scheduling
+is yours, which is what lets the same state machine run on a server, in a test,
+or in this page.
+
+See the [package reference](/packages/plugin-pomodoro-state/) for the full
+action list and the persistence helpers (`restore` / `persistState`).
