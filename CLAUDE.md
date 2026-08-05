@@ -65,12 +65,36 @@ Changesets で採番し、`main` への push で npm publish する。
 
 兄弟リポジトリ `design-system` で publish が実際に2回連続で失敗して判明した経緯がある。**初回 publish 前に必ず両方を確認すること。** 手順の詳細はルート `README.md` の「リリース」節にある。
 
-1. **npm 側**: パッケージごとに Trusted Publisher（GitHub Actions / `insession-space` / `insession-sdk` / `release.yml`）を登録する。未登録だと OIDC トークンが認証情報に交換されず publish が E404 で落ちる
+1. **npm 側**: パッケージごとに Trusted Publisher（GitHub Actions / `insession-space` / `insession-sdk` / `release.yml`）を登録する。未登録だと OIDC トークンが認証情報に交換されず publish が E404 で落ちる。**⚠ 新規パッケージはこの登録が先にできない** — 下記「新規パッケージの初回だけは手動 publish が要る」を参照
 2. **GitHub org 側**: 「Allow GitHub Actions to create and approve pull requests」をON。未許可だと Version PR が作られず採番が進まない
 
-### ローカルから publish しない
+### ⚠ 新規パッケージの初回だけは手動 publish が要る（順序が逆にできない）
 
-npm はアカウントの 2FA か bypass 2FA 付きトークンを要求するうえ、手元から出すと **provenance の無い版がレジストリに残る**。publish は CI（OIDC）経由が基本。
+**Trusted Publisher は「既に存在するパッケージ」にしか登録できない。** 登録画面が `https://www.npmjs.com/package/@insession/<名前>/access` というパッケージページ配下にあるため、まだ npm に無いパッケージには登録しようがない。つまり上の「初回 publish 前に登録する」は**新規パッケージには適用できない**。
+
+したがって新規パッケージの立ち上げはこの順序になる:
+
+1. **手元から初回版を publish してパッケージを作る**（`npm login` → `npm publish --otp=<6桁>`）
+2. できたパッケージページで **Trusted Publisher を登録する**
+3. 以降の版は CI（OIDC）から provenance 付きで出る
+
+**初回版だけは provenance が付かない。** これは避けられない。既存3パッケージも同じで、`@insession/ws-resilient-transport` は `0.1.0` だけ provenance が無く、`0.2.0` 以降に付いている。
+
+> ⚠ **順序を間違えると Version PR をマージした瞬間に release が落ちる。** 症状は `E404 Not Found - PUT`。npm は書き込み権限の不足を 403 ではなく 404 で返すので「パッケージが無い」ように見えるが、**未ログイン・権限不足・Trusted Publisher 未登録のどれでも同じ 404 になる**ため区別が付かない。手元で切り分けるなら `npm whoami --registry https://registry.npmjs.org/` を打つ（401 なら単に未ログイン）。
+>
+> 落ちても壊れるものは無い。採番のコミットが `main` に載るだけなので、原因を潰してから手動 publish するか、失敗した run を再実行すればよい。
+
+### ローカルから publish しない（既存パッケージの話）
+
+npm はアカウントの 2FA か bypass 2FA 付きトークンを要求するうえ、手元から出すと **provenance の無い版がレジストリに残る**。publish は CI（OIDC）経由が基本。**上記のとおり新規パッケージの初回だけが例外**で、それ以外で手元から出す理由は無い。
+
+> **⚠ 手元から publish するときは `publishConfig.registry` が効いていることが前提。** 開発機の `~/.npmrc` は `registry` を社内プロキシ（`https://npm.flatt.tech/`）に向けていることがあり、`publishConfig.registry` が無いと publish がプロキシ宛になって**公開レジストリに出ない**。
+>
+> 同じ理由で、**publish 直後の確認に `npm view` を使うと嘘をつく** — 読み取りもプロキシへ行くため、出たばかりのパッケージが 404 に見える。公開レジストリを直接見ること:
+>
+> ```bash
+> curl -s https://registry.npmjs.org/@insession%2F<名前> | jq '.["dist-tags"]'
+> ```
 
 ## ⚠ このリポジトリに入れるもの / 入れないもの
 
