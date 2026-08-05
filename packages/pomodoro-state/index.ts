@@ -333,7 +333,19 @@ function sanitizeDeclarations(raw: unknown): Record<string, PomodoroDeclaration>
       0,
       RESTORE_MAX_CHEERS,
     );
-    out[name] = { text, uid, cheers };
+    // Defined rather than assigned: `name` comes from storage, and a plain
+    // `out[name] = ...` with the name `'__proto__'` would invoke the setter
+    // and replace this object's prototype with stored data instead of adding
+    // a key. The declaration would vanish, and `for...in` over the result
+    // would start yielding `text`/`uid`/`cheers` from the swapped prototype.
+    // `defineProperty` always creates an own property, so a member whose
+    // display name happens to be `'__proto__'` round-trips like any other.
+    Object.defineProperty(out, name, {
+      value: { text, uid, cheers },
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
   return out;
 }

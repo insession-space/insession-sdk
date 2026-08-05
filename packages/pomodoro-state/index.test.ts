@@ -539,3 +539,24 @@ test('declare: whitespace-only text clears an existing declaration', () => {
   assert.ok(next);
   assert.equal('alice' in (next?.declarations ?? {}), false);
 });
+
+// A member whose display name is `__proto__` must round-trip like any other.
+// A plain `out[name] = ...` in restore would invoke the `__proto__` setter,
+// swapping the returned object's prototype for stored data: the declaration
+// would silently vanish and `for...in` would start yielding `text`/`uid`/
+// `cheers` from the swapped prototype.
+test('restore: a __proto__ member name becomes an own key, not a prototype swap', () => {
+  const declared = reduce(null, 'declare', { by: '__proto__', text: 'hello', uid: 'u1' });
+  assert.ok(declared);
+  // Simulate the storage round trip the host performs (JSON in, JSON out).
+  const persisted = JSON.parse(JSON.stringify(persistState(declared)));
+
+  const back = restore(persisted);
+  assert.ok(back);
+  assert.equal(Object.getPrototypeOf(back.declarations), Object.prototype);
+  assert.ok(Object.hasOwn(back.declarations, '__proto__'));
+  assert.deepEqual(back.declarations['__proto__'], { text: 'hello', uid: 'u1', cheers: [] });
+  assert.deepEqual(Object.keys(back.declarations), ['__proto__']);
+  // Nothing leaked onto the global prototype.
+  assert.equal(({} as Record<string, unknown>).text, undefined);
+});
