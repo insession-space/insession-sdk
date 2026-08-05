@@ -4,7 +4,7 @@ description: Zero-dependency building blocks for realtime shared rooms — a res
 template: splash
 hero:
   title: Realtime rooms, without the plumbing
-  tagline: Four small, zero-dependency packages pulled out of a production realtime app — a WebSocket transport that survives deploys, and state stores you can test without a server.
+  tagline: Five small, zero-dependency packages pulled out of a production realtime app — a WebSocket transport that survives deploys, and state stores you can test without a server.
   actions:
     - text: Get started
       link: /getting-started/
@@ -89,11 +89,28 @@ hero:
       <a href="https://www.npmjs.com/package/@insession/plugin-pomodoro-state">npm</a>
     </div>
   </div>
+
+  <div class="pkg-card">
+    <h3>@insession/plugin-whiteboard-state</h3>
+    <p>
+      A server-authoritative Whiteboard state machine: shared free-draw strokes/shapes, plus an
+      optional "drawing telephone" relay game with its own phase timing.
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">0 dependencies</span>
+      <span class="pkg-tag">pure reducer</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/packages/plugin-whiteboard-state/">Docs</a>
+      <a href="https://www.npmjs.com/package/@insession/plugin-whiteboard-state">npm</a>
+    </div>
+  </div>
 </div>
 
 <p class="dep-note">
   Only one edge between them: <code>space-state-react</code> → <code>space-state</code>.
-  <code>ws-resilient-transport</code> and <code>plugin-pomodoro-state</code> are independent — carrying bytes and holding state are
+  <code>ws-resilient-transport</code>, <code>plugin-pomodoro-state</code>, and
+  <code>plugin-whiteboard-state</code> are independent — carrying bytes and holding state are
   kept apart on purpose, so you can adopt either one alone.
 </p>
 

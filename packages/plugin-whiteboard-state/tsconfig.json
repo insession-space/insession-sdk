@@ -1,0 +1,10 @@
+{
+  // plugin-whiteboard-state は DOM を使わない純粋な状態機械。tsc は型検査専用(noEmit)。
+  // 配布物(dist)の生成は tsup が行う(tsup.config.ts)。
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["dist", "node_modules"]
+}

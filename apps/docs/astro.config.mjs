@@ -52,6 +52,7 @@ export default defineConfig({
             { label: 'space-state', slug: 'packages/space-state' },
             { label: 'space-state-react', slug: 'packages/space-state-react' },
             { label: 'plugin-pomodoro-state', slug: 'packages/plugin-pomodoro-state' },
+            { label: 'plugin-whiteboard-state', slug: 'packages/plugin-whiteboard-state' },
           ],
         },
         {
