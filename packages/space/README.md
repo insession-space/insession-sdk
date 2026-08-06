@@ -208,7 +208,9 @@ Every accepted extension transition ends with exactly one of `schedule-timer` / 
 
 `createExtensionRegistry(extensions, options?)` — `names`, `has`, `get`, `initState`, `applyAction`, `timerDelay`, `applyTimer`, `persist`, `restore`, `clientExtensions`.
 
-Member functions over a plain `SpaceMember[]` — `addConnection`, `removeConnection`, `setPresence`, `findMember`, `hasConnection`, `isFirstConnectionOfUid`, `isLastConnectionOfUid`, `dedupeByUid`.
+Member functions over a plain `SpaceMember[]` — `addConnection`, `removeConnection`, `setPresence`, `findMember`, `hasConnection`, `isFirstConnectionOfUid`, `isLastConnectionOfUid`.
+
+`dedupeByUid` is generic over your own member row (`<T extends DedupableMember>`): it reads only `uid` and `presence`, and hands entries back as they went in — apart from `presence`, the one field it may rewrite. Use it on a lobby list that carries avatars and whatever else you render, without pushing that shape through `SpaceMember`.
 
 ## Test
 

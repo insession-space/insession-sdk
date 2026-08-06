@@ -41,3 +41,22 @@ test('a person with every device away stays away', () => {
     ['away'],
   );
 });
+
+test('dedupeByUid preserves the caller own row shape', () => {
+  // Hosts have their own richer member row (avatar, what the client is looking
+  // at, ...). Collapsing must not force it through this package's shape — the
+  // entries come back as they went in, apart from `presence`.
+  const rows = [
+    { id: 1, uid: 'u1', presence: 'away' as const, avatar: 'a.png', stage: 'player' },
+    { id: 2, uid: 'u1', presence: 'active' as const, avatar: 'a.png', stage: 'chat' },
+    { id: 3, uid: null, presence: 'active' as const, avatar: null, stage: null },
+  ];
+  const out = dedupeByUid(rows);
+  assert.deepEqual(
+    out.map((r) => r.id),
+    [1, 3],
+  );
+  assert.equal(out[0].avatar, 'a.png', 'extra fields survive');
+  assert.equal(out[0].stage, 'player', 'the first connection holds the slot');
+  assert.equal(out[0].presence, 'active', 'one active device makes the person active');
+});
