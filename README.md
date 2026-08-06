@@ -15,6 +15,7 @@ InSession 本体（[`insession-app`](https://github.com/insession-space/insessio
 
 | パッケージ | 内容 |
 | --- | --- |
+| [`@insession/space`](./packages/space) | **space の親パッケージ。** 依存ゼロで、ヘッドレスなスペースを extension の集合として組み立てる。extension 契約（`defineSpaceExtension`）・集約 registry・参加者ライフサイクル（members / presence / 参加・離脱）・インスタンス（`createSpace`）を持つ。WS サーバーとストレージは利用者が自前で持ち、こちらは I/O を一切行わず effect 記述子を返すだけ。**グローバルなアプリ一覧を持たず（extensions 配列が唯一の真実）**、状態は `name` で名前空間化される |
 | [`@insession/ws-resilient-transport`](./packages/ws-resilient-transport) | 本番デプロイの都合に合わせて再接続する WebSocket トランスポート。サービス再起動時の高速再接続とジッター付き指数バックオフを両立する。依存ゼロ |
 | [`@insession/space-state`](./packages/space-state) | transport・フレームワーク非依存のスペース状態 store。受信は純粋 reducer、副作用は記述子で返すだけ。依存ゼロ |
 | [`@insession/space-state-react`](./packages/space-state-react) | 上を React の `useSyncExternalStore` に繋ぐ薄いラッパー |
@@ -42,6 +43,7 @@ plugin の **server 面**（UI・i18n・design-system への依存を持たな�
 ```
 insession-sdk/
 ├── packages/
+│   ├── space/                     # @insession/space（space の親）
 │   ├── ws-resilient-transport/   # @insession/ws-resilient-transport
 │   ├── space-state/              # @insession/space-state
 │   ├── space-state-react/        # @insession/space-state-react

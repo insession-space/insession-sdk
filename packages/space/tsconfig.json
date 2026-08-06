@@ -1,0 +1,10 @@
+{
+  // space は DOM を使わない契約＋集約のみ。tsc は型検査専用（noEmit）。
+  // 配布物(dist)の生成は tsup が行う（tsup.config.ts）。
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["dist", "node_modules"]
+}
