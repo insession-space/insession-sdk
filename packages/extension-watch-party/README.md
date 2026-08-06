@@ -1,8 +1,8 @@
-# @insession/plugin-watch-party-state
+# @insession/extension-watch-party
 
 A **dependency-free, server-authoritative Watch Party state machine**: one
 shared "now playing" item (a YouTube video or a SoundCloud track), a queue,
-and a play history — synchronized across everyone in a room.
+and a play history — synchronized across everyone in a space.
 
 Building "everyone watches the same video, in sync" is deceptively fiddly:
 broadcasting a position every second wastes bandwidth and still drifts, a
@@ -56,12 +56,40 @@ dependencies**, including no HTTP client, so it cannot and does not:
 ## Install
 
 ```sh
-npm install @insession/plugin-watch-party-state
+npm install @insession/extension-watch-party
 ```
 
 Published as a built package with both ESM (`dist/index.js`) and CommonJS
 (`dist/index.cjs`) entry points plus `dist/index.d.ts` types, no runtime
 dependencies.
+
+> Renamed from `@insession/plugin-watch-party-state` at 0.4.0. The old name is
+> deprecated on npm; the API is unchanged apart from the addition of
+> `watchPartyExtension` below.
+
+## Drop it into a space
+
+If you are assembling a space with
+[`@insession/space`](https://www.npmjs.com/package/@insession/space), the whole
+integration is one line — the extension carries its own name, reducer and
+persistence rules, and its effects arrive tagged with their origin:
+
+```ts
+import { createSpace } from '@insession/space';
+import { watchPartyExtension } from '@insession/extension-watch-party';
+
+const space = createSpace({ extensions: [watchPartyExtension({ pickShuffleIndex })] });
+
+space.dispatch('watch-party', 'load-video', { videoId, by: name });
+// -> [broadcast, { type: 'extension', extension: 'watch-party', effect: { type: 'persist-playback', ... } }, clear-timer]
+```
+
+Every option `createWatchParty` takes is accepted here too, plus `{ name }` to
+occupy a different key.
+
+Nothing is imported from `@insession/space` to build that object: it satisfies
+that package's `SpaceExtension` structurally, so this package keeps its zero
+dependencies and everything below still works without it.
 
 ## Usage
 
@@ -70,7 +98,7 @@ import {
   createWatchParty,
   type WatchPartyEffect,
   type WatchPartyState,
-} from '@insession/plugin-watch-party-state';
+} from '@insession/extension-watch-party';
 
 const watchParty = createWatchParty({
   // Optional: how to pick a candidate when shuffle is on. Omit it and
@@ -79,7 +107,7 @@ const watchParty = createWatchParty({
     Math.floor(Math.random() * items.length),
 });
 
-// Somewhere you keep one WatchPartyState per room, e.g. a Map<roomId, WatchPartyState>.
+// Somewhere you keep one WatchPartyState per space, e.g. a Map<spaceId, WatchPartyState>.
 let state: WatchPartyState = watchParty.defaultState();
 
 // A client action arrives over your transport (WebSocket, etc). `by`/`addedBy`
@@ -94,16 +122,16 @@ function onClientAction(action: string, payload: unknown) {
 function runEffect(effect: WatchPartyEffect) {
   switch (effect.type) {
     case 'broadcast':
-      broadcastToRoom(effect.message, { excludeSender: effect.excludeSender });
+      broadcastToSpace(effect.message, { excludeSender: effect.excludeSender });
       break;
     case 'send-to-sender':
       sendToSender(effect.message);
       break;
     case 'persist-playback':
-      db.savePlaybackState(roomId, effect.videoId, effect.isPlaying, effect.position).catch(() => {});
+      db.savePlaybackState(spaceId, effect.videoId, effect.isPlaying, effect.position).catch(() => {});
       break;
     case 'persist-media':
-      db.saveMedia(roomId, effect.provider, effect.mediaUrl, effect.thumbnail).catch(() => {});
+      db.saveMedia(spaceId, effect.provider, effect.mediaUrl, effect.thumbnail).catch(() => {});
       break;
     case 'resolve-metadata':
       // Go fetch a title/duration however you like (oEmbed, a provider API,
@@ -123,7 +151,7 @@ function runEffect(effect: WatchPartyEffect) {
   }
 }
 
-// Load from storage on room startup / first join.
+// Load from storage on space startup / first join.
 function loadFromDb(raw: unknown) {
   state = watchParty.restore(raw) ?? watchParty.defaultState();
 }
@@ -155,7 +183,7 @@ use — `reduce` never throws on malformed input.
 
 A few payload fields are **host-trusted settings**, not wire data: `shuffleEnabled`,
 `mixActive`, `maxQueueLength`, `maxPerUser`, and `maxDurationSec`. Your host is
-expected to read these from its own room/space settings and fold them into the
+expected to read these from its own space settings and fold them into the
 payload before calling `reduce` — the same way it's expected to derive `by`/
 `addedBy` from an authenticated session rather than trust a client-submitted name.
 
@@ -234,7 +262,7 @@ package's own queue-advance race against it.
 ```ts
 watchParty.reduce(state, 'video-ended', {
   videoId: endedVideoId,
-  mixActive: yourMixFeature.hasNextTrack(myRoom),
+  mixActive: yourMixFeature.hasNextTrack(mySpace),
 });
 ```
 
@@ -244,7 +272,7 @@ point, including what happens if it turns out to have no candidate either.
 
 This is a plain payload flag rather than a function injected into
 `createWatchParty` (contrast `pickShuffleIndex`, which *is* injected at the
-factory level) because whether a mix is active is dynamic, per-room state —
+factory level) because whether a mix is active is dynamic, per-space state —
 it can turn on or off between one `video-ended` call and the next. A
 factory-level callback would go stale the instant that happens; your host
 already knows the answer synchronously when it decides to call `reduce`, so
@@ -255,7 +283,7 @@ it's simplest for it to just say so.
 This is a deliberate design decision, not a stub. `pause` applies **only to
 the client that pressed it** — the shared server state (`isPlaying`,
 `position`) is untouched, and nothing is broadcast to anyone else. `play` and
-`seek` *do* affect the whole room, which makes `pause` doing nothing look
+`seek` *do* affect the whole space, which makes `pause` doing nothing look
 like an inconsistency at first glance, but pausing your own player (to
 answer the door, say) shouldn't stop the video for everyone else. Every other
 client — including the pauser's own state on reconnect — keeps playing from
@@ -286,7 +314,7 @@ in the payload is ignored and the queue always advances FIFO.
 | Export | Signature | Meaning |
 | --- | --- | --- |
 | `createWatchParty` | `(options?: { pickShuffleIndex?, autoAdvanceBy? }) => WatchPartyStateApi` | Builds the API. Both options are optional. |
-| `defaultState()` | `() => WatchPartyState` | An empty room: nothing loaded, empty queue/history. Also available as a top-level export (independent of `createWatchParty`'s options). |
+| `defaultState()` | `() => WatchPartyState` | An empty space: nothing loaded, empty queue/history. Also available as a top-level export (independent of `createWatchParty`'s options). |
 | `currentPosition(state)` | `(state: WatchPartyState) => number` | The playback position right now, extrapolated by wall clock while playing. Also available as a top-level export. |
 | `.reduce` | `(state, action, payload?) => { state, effects } \| null` | Applies one action. `null` means "ignore" (invalid or a no-op). |
 | `.restore` | `(raw: unknown) => WatchPartyState \| null` | Normalizes state loaded from storage. `null` only for non-object input; playback always comes back stopped. |
@@ -295,7 +323,7 @@ in the payload is ignored and the queue always advances FIFO.
 
 - `pickShuffleIndex?: (items, currentVideoId) => number` — see [Shuffle](#shuffle).
 - `autoAdvanceBy?: string` — the `by` value stamped on items that start
-  playing without a specific acting member (an empty room's first `queue-add`,
+  playing without a specific acting member (an empty space's first `queue-add`,
   or `video-ended`'s queue-advance). Defaults to `'queue'`. Lets your UI
   distinguish "the queue advanced this on its own" from "a member pressed
   play" — pass your own value if you want one distinct from real member names.

@@ -1,4 +1,6 @@
-# @insession/plugin-pomodoro-state
+# @insession/extension-pomodoro
+
+> Renamed from `@insession/plugin-pomodoro-state` at 0.2.0. Entries below 0.2.0 were published under the old name.
 
 ## 0.1.0
 

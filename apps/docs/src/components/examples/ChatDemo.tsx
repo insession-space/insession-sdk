@@ -1,4 +1,4 @@
-// @insession/chat-state の実動作デモ。
+// @insession/extension-chat の実動作デモ。
 //
 // ⚠ 挙動を再実装しないこと。ここは npm に出ているパッケージそのものを import して動かす。
 // デモが独自の状態機械を持つと、パッケージを直したときにデモだけ古くなる。
@@ -23,7 +23,7 @@ import {
   type ChatState,
   type ChatStateApi,
   createChatState,
-} from '@insession/chat-state';
+} from '@insession/extension-chat';
 import { useRef, useState } from 'react';
 import { pushEntry, type TraceEntry, TraceList } from './Trace.tsx';
 
@@ -243,7 +243,7 @@ export default function ChatDemo() {
   return (
     <div className="demo not-content">
       <div className="demo-bar">
-        <span>@insession/chat-state</span>
+        <span>@insession/extension-chat</span>
         <span className="demo-api">createChatState / reduce / restore</span>
       </div>
       <div className="demo-body">

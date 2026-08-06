@@ -1,4 +1,4 @@
-// @insession/plugin-whiteboard-state の実動作デモ。
+// @insession/extension-whiteboard の実動作デモ。
 //
 // ⚠ 挙動を再実装しないこと。ここは npm に出ているパッケージそのものを import して動かす。
 // デモが独自の状態機械を持つと、パッケージを直したときにデモだけ古くなる。
@@ -17,7 +17,7 @@ import {
   createWhiteboardState,
   type WhiteboardState,
   type WhiteboardStateApi,
-} from '@insession/plugin-whiteboard-state';
+} from '@insession/extension-whiteboard';
 import { useEffect, useRef, useState } from 'react';
 import { pushEntry, type TraceEntry, TraceList } from './Trace.tsx';
 
@@ -114,7 +114,7 @@ export default function WhiteboardDemo() {
   return (
     <div className="demo not-content">
       <div className="demo-bar">
-        <span>@insession/plugin-whiteboard-state</span>
+        <span>@insession/extension-whiteboard</span>
         <span className="demo-api">createWhiteboardState / reduce / timerDelay / onTimer</span>
       </div>
       <div className="demo-body">

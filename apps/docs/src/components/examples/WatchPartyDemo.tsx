@@ -1,4 +1,4 @@
-// @insession/plugin-watch-party-state の実動作デモ。
+// @insession/extension-watch-party の実動作デモ。
 //
 // ⚠ 挙動を再実装しないこと。ここは npm に出ているパッケージそのものを import して動かす。
 // デモが独自の状態機械を持つと、パッケージを直したときにデモだけ古くなる。
@@ -24,7 +24,7 @@ import {
   type WatchPartyPayload,
   type WatchPartyState,
   type WatchPartyStateApi,
-} from '@insession/plugin-watch-party-state';
+} from '@insession/extension-watch-party';
 import { useEffect, useState } from 'react';
 import { pushEntry, type TraceEntry, TraceList } from './Trace.tsx';
 
@@ -111,7 +111,7 @@ export default function WatchPartyDemo() {
   return (
     <div className="demo not-content">
       <div className="demo-bar">
-        <span>@insession/plugin-watch-party-state</span>
+        <span>@insession/extension-watch-party</span>
         <span className="demo-api">createWatchParty / reduce / currentPosition</span>
       </div>
       <div className="demo-body">

@@ -1,4 +1,6 @@
-# @insession/chat-state
+# @insession/extension-chat
+
+> Renamed from `@insession/chat-state` at 0.2.0. Entries below 0.2.0 were published under the old name.
 
 ## 0.1.0
 

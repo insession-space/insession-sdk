@@ -12,12 +12,12 @@
 | `packages/ws-resilient-transport` | `@insession/ws-resilient-transport` | 本番デプロイの都合に合わせて再接続する WebSocket トランスポート（サービス再起動時の高速再接続 / ジッター付き指数バックオフ / terminal close code） | **なし** |
 | `packages/space-state` | `@insession/space-state` | transport・フレームワーク非依存のスペース状態 store。受信は純粋 reducer、送信は `onSend` に流すだけ、副作用は effect 記述子で返すだけ | **なし** |
 | `packages/space-state-react` | `@insession/space-state-react` | 上を React の `useSyncExternalStore` に繋ぐ薄いラッパー（1関数） | `space-state` / peer に `react` |
-| `packages/plugin-pomodoro-state` | `@insession/plugin-pomodoro-state` | 依存ゼロのポモドーロタイマー状態機械（server-authoritative。`reduce` は純関数、`restore`/`persistState` で永続化境界を扱う） | **なし** |
-| `packages/plugin-whiteboard-state` | `@insession/plugin-whiteboard-state` | 依存ゼロのホワイトボード状態機械（server-authoritative。自由描画の strokes/shapes と「お絵かき伝言ゲーム」relay を同居させた `reduce` は純関数） | **なし** |
-| `packages/plugin-watch-party-state` | `@insession/plugin-watch-party-state` | 依存ゼロの Watch Party（動画/音声の同期再生）状態機械（server-authoritative。`reduce` は `{ state, effects }` を返す純関数で、broadcast/永続化/タイトル解決は effect 記述子としてホストに委ねる） | **なし** |
-| `packages/chat-state` | `@insession/chat-state` | 依存ゼロのチャット状態機械（server-authoritative。メッセージの正規化・スタンプ検証・返信・リアクション・ピン留め。`reduce` は `{ state, effects }` を返す純関数で、永続化/broadcast/bot 通知は effect 記述子としてホストに委ねる） | **なし** |
+| `packages/extension-pomodoro` | `@insession/extension-pomodoro` | 依存ゼロのポモドーロタイマー状態機械（server-authoritative。`reduce` は純関数、`restore`/`persistState` で永続化境界を扱う） | **なし** |
+| `packages/extension-whiteboard` | `@insession/extension-whiteboard` | 依存ゼロのホワイトボード状態機械（server-authoritative。自由描画の strokes/shapes と「お絵かき伝言ゲーム」relay を同居させた `reduce` は純関数） | **なし** |
+| `packages/extension-watch-party` | `@insession/extension-watch-party` | 依存ゼロの Watch Party（動画/音声の同期再生）状態機械（server-authoritative。`reduce` は `{ state, effects }` を返す純関数で、broadcast/永続化/タイトル解決は effect 記述子としてホストに委ねる） | **なし** |
+| `packages/extension-chat` | `@insession/extension-chat` | 依存ゼロのチャット状態機械（server-authoritative。メッセージの正規化・スタンプ検証・返信・リアクション・ピン留め。`reduce` は `{ state, effects }` を返す純関数で、永続化/broadcast/bot 通知は effect 記述子としてホストに委ねる） | **なし** |
 
-**依存の向きは `space-state-react` → `space-state` の一方向だけ。** `space` / `ws-resilient-transport` と `plugin-pomodoro-state` / `plugin-whiteboard-state` / `plugin-watch-party-state` / `chat-state` は完全に独立していて、他のパッケージと繋がっていない（transport と状態管理を分けているのが設計の要点なので、ここに依存を足さない）。
+**依存の向きは `space-state-react` → `space-state` の一方向だけ。** `space` / `ws-resilient-transport` と `extension-pomodoro` / `extension-whiteboard` / `extension-watch-party` / `extension-chat` は完全に独立していて、他のパッケージと繋がっていない（transport と状態管理を分けているのが設計の要点なので、ここに依存を足さない）。
 
 **⚠ `space` が状態機械パッケージに依存しないのは意図的。** 親パッケージが特定の実装を import すると「どの状態機械を使うか」を契約側が決めてしまう。`space` は既存4つが**既に満たしている形**（`defaultState` / `reduce` / `timerDelay` / `onTimer` / `restore` / `persistState`）を型として言語化しただけなので、消費側が `defineSpaceExtension({ name, server: <既存パッケージの API> })` と書けば構造的に嵌る。逆向き（状態機械側が `space` を import する）も同じ理由で足さないこと — 依存ゼロが売りのパッケージにランタイム依存が1つ増える。
 
@@ -25,7 +25,7 @@
 
 **⚠ `space-core` という名前を使わないこと。** `insession-app` に `@in-session/space-core`（React・UI 込み・private）が実在する。ハイフン1つしか違わないのに責務が正反対で、しかも `insession-app` では**両方が同時にインストールされる**。補完で選び間違えても型が合うまで気づけない。
 
-**「依存ゼロ」は `space` / `ws-resilient-transport` / `space-state` / `plugin-pomodoro-state` / `plugin-whiteboard-state` / `plugin-watch-party-state` / `chat-state` の売り。** 便利だからという理由でランタイム依存を1つでも足すと、このパッケージを選ぶ理由が消える。足したくなったら、まずそれが本当にこのリポジトリに置くべきものかを下記「入れるもの / 入れないもの」で判断すること。
+**「依存ゼロ」は `space` / `ws-resilient-transport` / `space-state` / `extension-pomodoro` / `extension-whiteboard` / `extension-watch-party` / `extension-chat` の売り。** 便利だからという理由でランタイム依存を1つでも足すと、このパッケージを選ぶ理由が消える。足したくなったら、まずそれが本当にこのリポジトリに置くべきものかを下記「入れるもの / 入れないもの」で判断すること。
 
 ## 開発の仕方
 
@@ -114,7 +114,7 @@ npm はアカウントの 2FA か bypass 2FA 付きトークンを要求する�
 | --- | --- |
 | 汎用のランタイム（`ws-resilient-transport`。InSession 固有の情報を1つも含まない） | **plugin**（`plugin-pomodoro` 等）。UI・i18n キー・プロダクト判断を抱えるので `insession-app` 側に置く |
 | 依存ゼロの状態機械（`space-state`）とその薄いバインディング（`space-state-react`） | **UI を持つもの全般**。`@insession/design-system` への依存をこのリポジトリに持ち込まない |
-| **ただし plugin の server 面**（UI・i18n・design-system への依存を持たず、外部 import がゼロの純粋な状態機械）は入れてよい（`plugin-pomodoro-state` / `plugin-whiteboard-state`） | plugin の **client 面**（UI コンポーネント。`pomodoro-kit` 等） |
+| **ただし plugin の server 面**（UI・i18n・design-system への依存を持たず、外部 import がゼロの純粋な状態機械）は入れてよい（`extension-pomodoro` / `extension-whiteboard`） | plugin の **client 面**（UI コンポーネント。`pomodoro-kit` 等） |
 
 **「`@insession/*` スコープだから」という理由だけでここへ移さないこと。** スコープは「OSS 候補である」という表明でしかなく、置き場所の判断とは別。plugin をここへ入れると次の3つが同時に起きる:
 
@@ -126,19 +126,21 @@ npm はアカウントの 2FA か bypass 2FA 付きトークンを要求する�
 
 ### 例外: plugin の server 面（純粋な状態機械）は入れてよい
 
-`plugin-pomodoro-state` は `insession-app` の `plugin-pomodoro` から **server 面だけ**（`reduce` / `timerDelay` / `onTimer` / `restore` / `persistState`）を切り出したもので、上の禁止理由3点のどれにも当たらない — 依存ゼロなので (1) が起きず、消費者はアプリのサーバー1箇所だけで UI を持たないため (2) のパネル修正ごとの publish サイクルが発生せず、仕様が安定した純粋関数なので (3) の採番の引きずり合いも起きない。
+`extension-pomodoro` は `insession-app` の `plugin-pomodoro` から **server 面だけ**（`reduce` / `timerDelay` / `onTimer` / `restore` / `persistState`）を切り出したもので、上の禁止理由3点のどれにも当たらない — 依存ゼロなので (1) が起きず、消費者はアプリのサーバー1箇所だけで UI を持たないため (2) のパネル修正ごとの publish サイクルが発生せず、仕様が安定した純粋関数なので (3) の採番の引きずり合いも起きない。
 
 **判断基準はこの1点に尽きる: 外部 import がゼロかどうか。** UI・i18n キー・`@insession/design-system` への依存が1つでもあれば `insession-app` に残す。**「server 面だから」で自動的に入れてよくなるわけではない** — 切り出した結果 import が1つでも残るなら、それは契約層ではなくプロダクトの一部なので向こうに置く。
 
-**`plugin-whiteboard-state` は「注入で解ければ移せる」という追加の型を示した。** 移植元の純粋部には唯一の外部依存（投稿画像URLが自前ストレージのものかを判定する `storage.isOwnUrl`）があり、これは InSession 固有のバケット設定を知っている。判断基準（外部 import がゼロか）自体は変わらないが、「元から import がゼロ」だけでなく「述語をホストから注入する形にして import をゼロにする」パターンでもここへ移せる。`plugin-whiteboard-state` はそれをファクトリ `createWhiteboardState({ isOwnImageUrl })` として実装した — SDK 側は「host が判定してくれる」という契約だけを持ち、InSession のストレージ設定そのものは持ち込まない。
+**`extension-whiteboard` は「注入で解ければ移せる」という追加の型を示した。** 移植元の純粋部には唯一の外部依存（投稿画像URLが自前ストレージのものかを判定する `storage.isOwnUrl`）があり、これは InSession 固有のバケット設定を知っている。判断基準（外部 import がゼロか）自体は変わらないが、「元から import がゼロ」だけでなく「述語をホストから注入する形にして import をゼロにする」パターンでもここへ移せる。`extension-whiteboard` はそれをファクトリ `createWhiteboardState({ isOwnImageUrl })` として実装した — SDK 側は「host が判定してくれる」という契約だけを持ち、InSession のストレージ設定そのものは持ち込まない。
 
-**`plugin-watch-party-state` はさらにもう一つの型を示した: 本物の副作用（broadcast・DB永続化・タイトル/尺の解決）を持つ plugin も、コールバック注入ではなく `@insession/space-state` と同じ「effect 記述子を返すだけ」の形にすれば、外部 import ゼロのまま移せる。** `plugin-pomodoro-state` / `plugin-whiteboard-state` の `reduce` は純粋な状態遷移だけを返せば足りたが、Watch Party の移植元は DB 書き込み・WS broadcast・YouTube oEmbed 取得を伴う。これらを `reduce` の内部で呼ぶ代わりに `{ state, effects: WatchPartyEffect[] }` を返し、実行はホストに委ねる（`resolve-metadata` effect でタイトル/尺の取得さえもホストへ投げ返す）。この設計のおかげで、I/O を持つ plugin であっても SDK 側は依然として「Date.now() 以外に副作用ゼロの純関数」のままでいられる。もう一つの外部依存だったランダム再生の選択ロジックは、`packages/protocol` がマイルームとも共有する単一ソースだったため、`plugin-whiteboard-state` の `isOwnImageUrl` と同じ注入パターン（`createWatchParty({ pickShuffleIndex })`）で解いた。
+**`extension-watch-party` はさらにもう一つの型を示した: 本物の副作用（broadcast・DB永続化・タイトル/尺の解決）を持つ plugin も、コールバック注入ではなく `@insession/space-state` と同じ「effect 記述子を返すだけ」の形にすれば、外部 import ゼロのまま移せる。** `extension-pomodoro` / `extension-whiteboard` の `reduce` は純粋な状態遷移だけを返せば足りたが、Watch Party の移植元は DB 書き込み・WS broadcast・YouTube oEmbed 取得を伴う。これらを `reduce` の内部で呼ぶ代わりに `{ state, effects: WatchPartyEffect[] }` を返し、実行はホストに委ねる（`resolve-metadata` effect でタイトル/尺の取得さえもホストへ投げ返す）。この設計のおかげで、I/O を持つ plugin であっても SDK 側は依然として「Date.now() 以外に副作用ゼロの純関数」のままでいられる。もう一つの外部依存だったランダム再生の選択ロジックは、`packages/protocol` がマイルームとも共有する単一ソースだったため、`extension-whiteboard` の `isOwnImageUrl` と同じ注入パターン（`createWatchParty({ pickShuffleIndex })`）で解いた。
 
-**`chat-state` は3つ目の型を示した: 外部依存が「非同期な判断」のときは、注入ではなくホストが先に解決して payload に畳み込む。** チャットのスタンプ画像URLの allowlist 照合は、自前ストレージの URL か・管理者が用意したプリセットか・そのスペースで有効か、という**4つの照合のうち2つが DB 参照**で、`plugin-whiteboard-state` の `isOwnImageUrl` のような同期述語には畳めない。async な述語を注入する形にすると `reduce` 自体が async になり、このリポジトリの全パッケージが共有している「`reduce` は純関数」という性質が壊れる。そこで `stickerAllowed: boolean` という **host-trusted な payload フィールド**として受ける形にした（`plugin-watch-party-state` が `shuffleEnabled` 等の設定を payload で受けるのと同じ扱い）。**注入・effect 記述子・payload 畳み込みの3つは、どれも「外部 import をゼロにする」ための手段であって優劣は無い。判断基準は変わらず『外部 import がゼロか』の1点。**
+**`extension-chat` は3つ目の型を示した: 外部依存が「非同期な判断」のときは、注入ではなくホストが先に解決して payload に畳み込む。** チャットのスタンプ画像URLの allowlist 照合は、自前ストレージの URL か・管理者が用意したプリセットか・そのスペースで有効か、という**4つの照合のうち2つが DB 参照**で、`extension-whiteboard` の `isOwnImageUrl` のような同期述語には畳めない。async な述語を注入する形にすると `reduce` 自体が async になり、このリポジトリの全パッケージが共有している「`reduce` は純関数」という性質が壊れる。そこで `stickerAllowed: boolean` という **host-trusted な payload フィールド**として受ける形にした（`extension-watch-party` が `shuffleEnabled` 等の設定を payload で受けるのと同じ扱い）。**注入・effect 記述子・payload 畳み込みの3つは、どれも「外部 import をゼロにする」ための手段であって優劣は無い。判断基準は変わらず『外部 import がゼロか』の1点。**
 
-**⚠ `chat-state` は plugin ではなく core 由来。** 上の表の「入れない」列にある **plugin** は名前でも由来でもなく、UI・i18n キー・プロダクト判断を抱えた実体を指す。チャットは InSession では plugin ではなく space の core 機能だが、server 面を切り出した結果 UI も i18n も持たず外部 import がゼロになったので、`plugin-*-state` と同じ資格でここに置ける。**「plugin の server 面だから入れてよい」ではなく「外部 import がゼロだから入れてよい」と読むこと。**
+**⚠ `extension-chat` は plugin ではなく core 由来。** 上の表の「入れない」列にある **plugin** は名前でも由来でもなく、UI・i18n キー・プロダクト判断を抱えた実体を指す。チャットは InSession では plugin ではなく space の core 機能だが、server 面を切り出した結果 UI も i18n も持たず外部 import がゼロになったので、`plugin-*-state` と同じ資格でここに置ける。**「plugin の server 面だから入れてよい」ではなく「外部 import がゼロだから入れてよい」と読むこと。**
 
-**⚠ 名前の `plugin-` 接頭辞は「どの plugin 由来か」を示すだけで、置き場所の判断とは関係しない。** 上の表の「入れない」列にある **plugin** は `plugin-` で始まる名前のことではなく、UI・i18n キー・プロダクト判断を抱えた実体のことを指す。`plugin-pomodoro-state` が入れてよいのは名前がどうであれ外部 import がゼロだからで、逆に `plugin-` が付かない名前でも design-system を1つ引いていれば入れられない。**名前ではなく中身で判断すること。**
+**⚠ 名前の `extension-` 接頭辞は「`@insession/space` に載る出荷物である」ことを示すだけで、置き場所の判断とは関係しない。** 上の表の「入れない」列にある **plugin** は名前のことではなく、UI・i18n キー・プロダクト判断を抱えた実体のことを指す。`extension-pomodoro` が入れてよいのは名前がどうであれ外部 import がゼロだからで、逆に `extension-` が付く名前でも design-system を1つ引いていれば入れられない。**名前ではなく中身で判断すること。**
+
+**⚠ 4つは `plugin-*-state` / `chat-state` から改名した。** 旧名は npm 上に残っていて deprecated。改名は「rename」ではなく「新名で publish し直して旧名を deprecate」なので、**新名の初回だけは手動 publish が要る**（下記「新規パッケージの初回だけは手動 publish が要る」と同じ理由）。旧名の版へ戻ることはないので、`insession-app` 側の import も新名へ寄せること。
 
 ## README は「外部公開の配布物」
 

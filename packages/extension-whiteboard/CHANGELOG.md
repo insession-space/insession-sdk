@@ -1,4 +1,6 @@
-# @insession/plugin-whiteboard-state
+# @insession/extension-whiteboard
+
+> Renamed from `@insession/plugin-whiteboard-state` at 0.2.0. Entries below 0.2.0 were published under the old name.
 
 ## 0.1.1
 

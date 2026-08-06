@@ -1,4 +1,4 @@
-// Run with: node --test packages/plugin-whiteboard-state
+// Run with: node --test packages/extension-whiteboard
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

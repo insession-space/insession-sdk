@@ -1,13 +1,13 @@
 /**
- * Conformance: the state machines already published from this repo satisfy
+ * Conformance: the extensions published from this repo satisfy
  * `ExtensionServerFacet` as they are.
  *
- * The whole argument for this package is that `plugin-pomodoro-state`,
- * `plugin-whiteboard-state`, `plugin-watch-party-state` and `chat-state` were
+ * The whole argument for this package is that `extension-pomodoro`,
+ * `extension-whiteboard`, `extension-watch-party` and `extension-chat` were
  * *already* the same shape, and that `defineSpaceExtension` only gave that
  * shape a name. That claim was checked by reading them. This file checks it by
- * running them: each one is wrapped without an adapter, driven through
- * `createSpace`, and asserted on.
+ * running them: each one is driven through `createSpace` and asserted on, both
+ * via the extension each package now ships and via its raw state-machine API.
  *
  * ⚠ The imports are **relative paths into the sibling sources**, not package
  * names. Two reasons:
@@ -22,10 +22,10 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createChatState } from '../chat-state/index.ts';
-import * as pomodoro from '../plugin-pomodoro-state/index.ts';
-import { createWatchParty } from '../plugin-watch-party-state/index.ts';
-import { createWhiteboardState } from '../plugin-whiteboard-state/index.ts';
+import { chatExtension, createChatState } from '../extension-chat/index.ts';
+import * as pomodoro from '../extension-pomodoro/index.ts';
+import { createWatchParty, watchPartyExtension } from '../extension-watch-party/index.ts';
+import { createWhiteboardState, whiteboardExtension } from '../extension-whiteboard/index.ts';
 import {
   createSpace,
   defineSpaceExtension,
@@ -33,24 +33,15 @@ import {
   type SpaceExtension,
 } from './index.ts';
 
-// Each of the four is wrapped exactly the way a consumer would: the package's
-// own API object handed straight to `server`, with no adapter in between. If
-// any of them drifts out of the contract, these four lines stop compiling.
-//
-// `plugin-pomodoro-state` exports loose functions rather than a factory, so a
-// namespace import *is* the facet — which is the strongest form of the claim.
-const Pomodoro = defineSpaceExtension({ name: 'pomodoro', server: pomodoro });
-
-const Whiteboard = defineSpaceExtension({
-  name: 'whiteboard',
-  server: createWhiteboardState({
-    isOwnImageUrl: (url) => url.startsWith('https://storage.example.com/'),
-  }),
+// Each package ships a ready extension, so the normal consumer writes nothing
+// at all. If any of them drifts out of the contract, these four lines stop
+// compiling.
+const Pomodoro = pomodoro.pomodoroExtension();
+const Whiteboard = whiteboardExtension({
+  isOwnImageUrl: (url) => url.startsWith('https://storage.example.com/'),
 });
-
-const WatchParty = defineSpaceExtension({ name: 'watchParty', server: createWatchParty() });
-
-const Chat = defineSpaceExtension({ name: 'chat', server: createChatState() });
+const WatchParty = watchPartyExtension();
+const Chat = chatExtension();
 
 const ALL = [Pomodoro, Whiteboard, WatchParty, Chat] as SpaceExtension[];
 
@@ -104,12 +95,34 @@ test('the optional members are present exactly where each package needs them', (
   assert.equal(has(Pomodoro, 'persistState'), true);
 });
 
+test('the raw state-machine APIs also satisfy the contract, with no wrapper at all', () => {
+  // The extension helpers each package now ships are a convenience, not the
+  // claim. The claim is that the state machines themselves are already the
+  // right shape — so a host that drives them directly, or one still on the
+  // pre-rename packages, can hand the bare API to `server` and get the same
+  // thing. `extension-pomodoro` exports loose functions rather than a factory,
+  // so a namespace import *is* the facet, which is the strongest form of it.
+  const raw = [
+    defineSpaceExtension({ name: 'pomodoro', server: pomodoro }),
+    defineSpaceExtension({
+      name: 'whiteboard',
+      server: createWhiteboardState({ isOwnImageUrl: () => true }),
+    }),
+    defineSpaceExtension({ name: 'watch-party', server: createWatchParty() }),
+    defineSpaceExtension({ name: 'chat', server: createChatState() }),
+  ] as SpaceExtension[];
+
+  const s = createSpace({ extensions: raw });
+  assert.deepEqual(s.getState().extensions, space().getState().extensions);
+  assert.deepEqual(types(s.dispatch('pomodoro', 'start')), ['broadcast', 'schedule-timer']);
+});
+
 test('all four coexist in one space, each owning its own namespaced slice', () => {
   const s = space();
   assert.deepEqual(Object.keys(s.getState().extensions).sort(), [
     'chat',
     'pomodoro',
-    'watchParty',
+    'watch-party',
     'whiteboard',
   ]);
   // Each slice is exactly what its own package would have produced alone.
@@ -204,19 +217,19 @@ test('whiteboard: an unknown action is a no-op, not a crash', () => {
 
 test('watch party: an effect-returning reducer has its own effects tagged', () => {
   const s = space();
-  const effects = s.dispatch('watchParty', 'load-video', {
+  const effects = s.dispatch('watch-party', 'load-video', {
     videoId: 'zyxwvutsrqp',
     by: 'Ada',
   });
 
   assert.equal(effects[0].type, 'broadcast', 'the state broadcast comes first');
-  assert.deepEqual(effects.at(-1), { type: 'clear-timer', extension: 'watchParty' });
+  assert.deepEqual(effects.at(-1), { type: 'clear-timer', extension: 'watch-party' });
   // Its domain effects arrive wrapped, so a host can tell whose they are —
   // `persist-playback` here would otherwise be indistinguishable from any
   // other extension's persistence effect.
   assert.ok(tagged(effects).includes('persist-playback'), tagged(effects).join(','));
   for (const e of effects) {
-    if (e.type === 'extension') assert.equal(e.extension, 'watchParty');
+    if (e.type === 'extension') assert.equal(e.extension, 'watch-party');
   }
 });
 
@@ -241,7 +254,7 @@ test('snapshot and hydrate round-trip every package at once', () => {
   const s = space();
   s.dispatch('pomodoro', 'start');
   s.dispatch('whiteboard', 'add-stroke', { stroke });
-  s.dispatch('watchParty', 'load-video', { videoId: 'zyxwvutsrqp', by: 'Ada' });
+  s.dispatch('watch-party', 'load-video', { videoId: 'zyxwvutsrqp', by: 'Ada' });
   s.dispatch('chat', 'pin-message', { messageId: 7, by: 'Ada' });
 
   const stored = JSON.parse(JSON.stringify(s.snapshot()));

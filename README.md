@@ -19,12 +19,12 @@ InSession 本体（[`insession-app`](https://github.com/insession-space/insessio
 | [`@insession/ws-resilient-transport`](./packages/ws-resilient-transport) | 本番デプロイの都合に合わせて再接続する WebSocket トランスポート。サービス再起動時の高速再接続とジッター付き指数バックオフを両立する。依存ゼロ |
 | [`@insession/space-state`](./packages/space-state) | transport・フレームワーク非依存のスペース状態 store。受信は純粋 reducer、副作用は記述子で返すだけ。依存ゼロ |
 | [`@insession/space-state-react`](./packages/space-state-react) | 上を React の `useSyncExternalStore` に繋ぐ薄いラッパー |
-| [`@insession/plugin-pomodoro-state`](./packages/plugin-pomodoro-state) | 依存ゼロのポモドーロタイマー状態機械。server-authoritative で `reduce` は純関数 |
-| [`@insession/plugin-whiteboard-state`](./packages/plugin-whiteboard-state) | 依存ゼロのホワイトボード状態機械。自由描画の strokes/shapes と「お絵かき伝言ゲーム」relay を持つ `reduce` は純関数。唯一の外部依存（投稿画像URLの許可判定）はファクトリ `createWhiteboardState` の引数として注入する |
-| [`@insession/plugin-watch-party-state`](./packages/plugin-watch-party-state) | 依存ゼロの Watch Party（動画/音声の同期再生）状態機械。`reduce` は `{ state, effects }` を返す純関数で、broadcast/persist/タイトル解決は effect 記述子としてホストに委ねる。唯一の外部依存（ランダム再生の選択ロジック）はファクトリ `createWatchParty` の `pickShuffleIndex` 引数として注入する |
-| [`@insession/chat-state`](./packages/chat-state) | 依存ゼロのチャット状態機械。メッセージの正規化・スタンプ検証・返信・リアクション・ピン留めを担う。ログはホストの DB が持つ前提で、メモリに置くのはピン留めだけ。ストレージにしか作れない値（永続 id 等）が要る3つの流れは、`reduce` を async にせず2段の往復（effect 記述子 → 結果を戻す）で表現する |
+| [`@insession/extension-pomodoro`](./packages/extension-pomodoro) | 依存ゼロのポモドーロタイマー状態機械。server-authoritative で `reduce` は純関数 |
+| [`@insession/extension-whiteboard`](./packages/extension-whiteboard) | 依存ゼロのホワイトボード状態機械。自由描画の strokes/shapes と「お絵かき伝言ゲーム」relay を持つ `reduce` は純関数。唯一の外部依存（投稿画像URLの許可判定）はファクトリ `createWhiteboardState` の引数として注入する |
+| [`@insession/extension-watch-party`](./packages/extension-watch-party) | 依存ゼロの Watch Party（動画/音声の同期再生）状態機械。`reduce` は `{ state, effects }` を返す純関数で、broadcast/persist/タイトル解決は effect 記述子としてホストに委ねる。唯一の外部依存（ランダム再生の選択ロジック）はファクトリ `createWatchParty` の `pickShuffleIndex` 引数として注入する |
+| [`@insession/extension-chat`](./packages/extension-chat) | 依存ゼロのチャット状態機械。メッセージの正規化・スタンプ検証・返信・リアクション・ピン留めを担う。ログはホストの DB が持つ前提で、メモリに置くのはピン留めだけ。ストレージにしか作れない値（永続 id 等）が要る3つの流れは、`reduce` を async にせず2段の往復（effect 記述子 → 結果を戻す）で表現する |
 
-plugin の **server 面**（UI・i18n・design-system への依存を持たない純粋な状態機械）はこのリポジトリへ移設する方針で、`plugin-pomodoro-state` / `plugin-whiteboard-state` がその実例。**UI を持つ部分**（client 面。`pomodoro-kit` 等）はプロダクト判断を抱えるため `insession-app` に残す
+plugin の **server 面**（UI・i18n・design-system への依存を持たない純粋な状態機械）はこのリポジトリへ移設する方針で、`extension-pomodoro` / `extension-whiteboard` がその実例。**UI を持つ部分**（client 面。`pomodoro-kit` 等）はプロダクト判断を抱えるため `insession-app` に残す
 （何をここへ入れてよいかの判断は `CLAUDE.md` の「入れるもの / 入れないもの」を参照）。
 
 ## なぜ InSession 本体から分かれているか
@@ -43,14 +43,14 @@ plugin の **server 面**（UI・i18n・design-system への依存を持たな�
 ```
 insession-sdk/
 ├── packages/
-│   ├── space/                     # @insession/space（space の親）
+│   ├── space/                    # @insession/space（space の親）
 │   ├── ws-resilient-transport/   # @insession/ws-resilient-transport
 │   ├── space-state/              # @insession/space-state
 │   ├── space-state-react/        # @insession/space-state-react
-│   ├── plugin-pomodoro-state/     # @insession/plugin-pomodoro-state
-│   ├── plugin-whiteboard-state/   # @insession/plugin-whiteboard-state
-│   ├── plugin-watch-party-state/  # @insession/plugin-watch-party-state
-│   └── chat-state/               # @insession/chat-state
+│   ├── extension-pomodoro/       # @insession/extension-pomodoro
+│   ├── extension-whiteboard/     # @insession/extension-whiteboard
+│   ├── extension-watch-party/    # @insession/extension-watch-party
+│   └── extension-chat/           # @insession/extension-chat
 ├── .changeset/
 ├── CLAUDE.md        # 作業規約（開発・changeset・リリース・置き場所の判断）
 └── .github/workflows/

@@ -1,12 +1,12 @@
 ---
 title: 'チャット'
-description: '@insession/chat-state の実動作デモ。メッセージ・スタンプ・返信・リアクション・ピン留めを、host 役をページが演じることで effect 記述子が見える形で確認できます。'
+description: '@insession/extension-chat の実動作デモ。メッセージ・スタンプ・返信・リアクション・ピン留めを、host 役をページが演じることで effect 記述子が見える形で確認できます。'
 ---
 
 import ChatDemo from '../../../../components/examples/ChatDemo.tsx';
 
 このパッケージはほとんど state を持ちません。チャットのログはメモリではなくデータベースに
-置くものなので、`@insession/chat-state` が実際に担っているのは**判断**です — 何をメッセージと
+置くものなので、`@insession/extension-chat` が実際に担っているのは**判断**です — 何をメッセージと
 見なすか、何を wire に流すか、そして host がどの副作用を実行しなければならないか。
 
 そのぶん、このサイトの中で effect 記述子のパターンが最も素直に見える場所でもあります。
@@ -49,7 +49,7 @@ import ChatDemo from '../../../../components/examples/ChatDemo.tsx';
 デモが import しているのは公開パッケージだけです:
 
 ```ts
-import { createChatState } from '@insession/chat-state';
+import { createChatState } from '@insession/extension-chat';
 
 const chat = createChatState();
 let state = chat.defaultState();
@@ -79,4 +79,4 @@ for (const effect of first?.effects ?? []) {
 テストでもこのページでも動くのはそのためです。
 
 アクションの全一覧・host が埋めるべきフィールド・永続化のヘルパー（`restore`）は
-[パッケージリファレンス](/ja/packages/chat-state/)を参照してください。
+[パッケージリファレンス](/ja/packages/extension-chat/)を参照してください。

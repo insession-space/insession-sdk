@@ -1,4 +1,4 @@
-// @insession/plugin-pomodoro-state の実動作デモ。
+// @insession/extension-pomodoro の実動作デモ。
 //
 // ⚠ 挙動を再実装しないこと。ここは npm に出ているパッケージそのものを import して動かす。
 // デモが独自の状態機械を持つと、パッケージを直したときにデモだけ古くなる。
@@ -15,7 +15,7 @@ import {
   type PomodoroState,
   reduce,
   timerDelay,
-} from '@insession/plugin-pomodoro-state';
+} from '@insession/extension-pomodoro';
 import { useEffect, useState } from 'react';
 import { pushEntry, type TraceEntry, TraceList } from './Trace.tsx';
 
@@ -91,7 +91,7 @@ export default function PomodoroDemo() {
   return (
     <div className="demo not-content">
       <div className="demo-bar">
-        <span>@insession/plugin-pomodoro-state</span>
+        <span>@insession/extension-pomodoro</span>
         <span className="demo-api">reduce / timerDelay / onTimer</span>
       </div>
       <div className="demo-body">

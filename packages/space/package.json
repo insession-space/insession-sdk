@@ -4,7 +4,7 @@
   "description": "A dependency-free engine for headless realtime spaces: bring your own WebSocket server and storage, and this owns who is connected, which extension owns which slice of its state, how actions reach the right reducer, and when timers need re-arming. Every transition returns effect descriptors instead of performing I/O.",
   "//": "このパッケージが space の親。extension 契約（defineSpaceExtension）・集約 registry・参加者ライフサイクル（members / presence）・インスタンス（createSpace）を1つに持つ。契約だけを別パッケージに切らないのは、契約とそれを消費する registry/members が必ず一緒に変わるため（別採番にすると1フィールド足すたびに2パッケージ2版の組み合わせが増える）。@tiptap/core が Editor と Extension を同居させているのと同じ判断。",
   "//name": "名前を space-core にしないこと。insession-app に @in-session/space-core（React・UI 込み・private）が実在し、ハイフン1つしか違わないうえ責務が正反対で、しかも insession-app では両方が同時にインストールされる。",
-  "//exports": "ESM に加えて CJS も出しているのは、消費者である insession-app のサーバーが .ts を直接実行しており require() で読むため。ESM only にすると require が壊れる(plugin-*-state / chat-state と同じ理由)。",
+  "//exports": "ESM に加えて CJS も出しているのは、消費者である insession-app のサーバーが .ts を直接実行しており require() で読むため。ESM only にすると require が壊れる(extension-* と同じ理由)。",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -52,7 +52,7 @@
     "test": "node --test",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "//dependencies": "依存ゼロ。状態機械パッケージ（plugin-*-state / chat-state）も import しない — 契約層が特定の実装を import すると『どの状態機械を使うか』を契約が決めてしまう。既存パッケージは構造的に嵌るので import は不要。",
+  "//dependencies": "依存ゼロ。状態機械パッケージ（extension-*）も import しない — 契約層が特定の実装を import すると『どの状態機械を使うか』を契約が決めてしまう。既存パッケージは構造的に嵌るので import は不要。",
   "dependencies": {},
   "devDependencies": {
     "tsup": "^8.3.5",

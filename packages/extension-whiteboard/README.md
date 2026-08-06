@@ -1,4 +1,4 @@
-# @insession/plugin-whiteboard-state
+# @insession/extension-whiteboard
 
 A **dependency-free, server-authoritative Whiteboard state machine**: a
 shared free-draw canvas (strokes + shapes) with an optional "drawing
@@ -42,7 +42,7 @@ storage's bucket, domain, or signing scheme, so it doesn't guess — you pass a
 predicate:
 
 ```ts
-import { createWhiteboardState } from '@insession/plugin-whiteboard-state';
+import { createWhiteboardState } from '@insession/extension-whiteboard';
 
 const whiteboard = createWhiteboardState({
   isOwnImageUrl: (url) => url.startsWith('https://cdn.example.com/uploads/'),
@@ -66,12 +66,41 @@ useful if you just need a fallback/initial value.
 ## Install
 
 ```sh
-npm install @insession/plugin-whiteboard-state
+npm install @insession/extension-whiteboard
 ```
 
 Published as a built package with both ESM (`dist/index.js`) and CommonJS
 (`dist/index.cjs`) entry points plus `dist/index.d.ts` types, no runtime
 dependencies.
+
+> Renamed from `@insession/plugin-whiteboard-state` at 0.2.0. The old name is
+> deprecated on npm; the API is unchanged apart from the addition of
+> `whiteboardExtension` below.
+
+## Drop it into a space
+
+If you are assembling a space with
+[`@insession/space`](https://www.npmjs.com/package/@insession/space), the whole
+integration is one line — the extension carries its own name, reducer, relay
+timers and persistence rules:
+
+```ts
+import { createSpace } from '@insession/space';
+import { whiteboardExtension } from '@insession/extension-whiteboard';
+
+const space = createSpace({
+  extensions: [whiteboardExtension({ isOwnImageUrl: (url) => url.startsWith(MY_BUCKET) })],
+});
+
+space.dispatch('whiteboard', 'add-stroke', { stroke }); // -> [broadcast, clear-timer]
+```
+
+`isOwnImageUrl` is required here for exactly the reason it is required by
+`createWhiteboardState` — see below. Pass `{ name }` to occupy a different key.
+
+Nothing is imported from `@insession/space` to build that object: it satisfies
+that package's `SpaceExtension` structurally, so this package keeps its zero
+dependencies and everything below still works without it.
 
 ## Usage
 
@@ -79,7 +108,7 @@ dependencies.
 import {
   createWhiteboardState,
   type WhiteboardState,
-} from '@insession/plugin-whiteboard-state';
+} from '@insession/extension-whiteboard';
 
 const whiteboard = createWhiteboardState({
   isOwnImageUrl: (url) => url.startsWith('https://cdn.example.com/uploads/'),
@@ -94,7 +123,7 @@ function onClientAction(action: string, payload: unknown) {
   const next = whiteboard.reduce(state, action, payload as Record<string, unknown>);
   if (!next) return; // invalid or a no-op — nothing changed, nothing to broadcast
   state = next;
-  broadcastToBoard({ type: 'plugin-whiteboard-state', state });
+  broadcastToBoard({ type: 'extension-whiteboard', state });
   scheduleRelayTimer();
 }
 
@@ -108,7 +137,7 @@ function scheduleRelayTimer() {
     const next = whiteboard.onTimer(state);
     if (!next) return;
     state = next;
-    broadcastToBoard({ type: 'plugin-whiteboard-state', state });
+    broadcastToBoard({ type: 'extension-whiteboard', state });
     scheduleRelayTimer();
   }, delay);
 }

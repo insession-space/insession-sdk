@@ -1,12 +1,12 @@
 ---
 title: 'Chat'
-description: A live demo of @insession/chat-state — messages, stickers, replies, reactions and a pinned message, with the host role played by the page so every effect descriptor is visible.
+description: A live demo of @insession/extension-chat — messages, stickers, replies, reactions and a pinned message, with the host role played by the page so every effect descriptor is visible.
 ---
 
 import ChatDemo from '../../../components/examples/ChatDemo.tsx';
 
 This package holds almost no state. A chat transcript belongs in your
-database, not in memory, so what `@insession/chat-state` actually owns is the
+database, not in memory, so what `@insession/extension-chat` actually owns is the
 *decisions* — what counts as a message, what goes on the wire, and which side
 effects the host has to perform.
 
@@ -58,7 +58,7 @@ returning `{ state, effects }`.
 The demo imports the published package and nothing else:
 
 ```ts
-import { createChatState } from '@insession/chat-state';
+import { createChatState } from '@insession/extension-chat';
 
 const chat = createChatState();
 let state = chat.defaultState();
@@ -89,5 +89,5 @@ impure thing anywhere in the package is `Date.now()`, which you can inject.
 That's what lets the same state machine run on a server, in a test, or in
 this page.
 
-See the [package reference](/packages/chat-state/) for the full action list,
+See the [package reference](/packages/extension-chat/) for the full action list,
 the host-trusted payload fields, and the persistence helpers (`restore`).

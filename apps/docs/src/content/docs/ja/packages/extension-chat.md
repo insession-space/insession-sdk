@@ -1,10 +1,10 @@
 ---
-title: '@insession/chat-state'
+title: '@insession/extension-chat'
 description: 依存ゼロの、サーバーを正とするチャット状態機械。メッセージの正規化・スタンプ検証・返信・リアクション・ピン留めを担う。
 ---
 
 :::note[英語版が正です]
-このページは [英語版](/packages/chat-state/) を訳したものです。英語版は npm に配布される
+このページは [英語版](/packages/extension-chat/) を訳したものです。英語版は npm に配布される
 `README.md` から自動生成されており、内容が食い違う場合は**英語版が正**です。
 :::
 
@@ -51,16 +51,42 @@ description: 依存ゼロの、サーバーを正とするチャット状態機�
 ## インストール
 
 ```sh
-npm install @insession/chat-state
+npm install @insession/extension-chat
 ```
 
 ESM（`dist/index.js`）と CommonJS（`dist/index.cjs`）の両方のエントリポイント、および
 `dist/index.d.ts` の型を含むビルド済みパッケージとして配布しています。ランタイム依存はありません。
 
+:::note[0.2.0 で改名しました]
+`@insession/chat-state` から改名しました。旧名は npm 上で deprecated です。
+API は下記の `chatExtension` が増えた以外に変更はありません。
+:::
+
+## スペースに載せる
+
+[`@insession/space`](/ja/packages/space/) でスペースを組み立てているなら、組み込みは1行です。
+extension が自分の名前・reducer・永続化の規則をまとめて持ち、effect には発生源が付いて届きます。
+
+```ts
+import { createSpace } from '@insession/space';
+import { chatExtension } from '@insession/extension-chat';
+
+const space = createSpace({ extensions: [chatExtension()] });
+
+space.dispatch('chat', 'chat', { text, by: name, uid, stickerAllowed });
+// -> [broadcast, { type: 'extension', extension: 'chat', effect: { type: 'persist-chat', draft } }, clear-timer]
+```
+
+`createChatState` が受け取るオプションはすべてここでも渡せます。加えて `{ name }` で
+別のキーを占有できます。
+
+このオブジェクトを作るのに `@insession/space` から何も import していません。あちらの
+`SpaceExtension` を**構造的に**満たしているだけなので、このパッケージは依存ゼロのままです。
+
 ## 使い方
 
 ```ts
-import { createChatState, type ChatEffect, type ChatState } from '@insession/chat-state';
+import { createChatState, type ChatEffect, type ChatState } from '@insession/extension-chat';
 
 const chat = createChatState();
 
@@ -153,7 +179,7 @@ function loadFromDb(raw: unknown) {
 クライアントの値をそのまま通すと、誰でも任意の名前を名乗り、任意の画像を承認できてしまいます。
 
 `stickerAllowed` が
-[`@insession/plugin-whiteboard-state`](https://www.npmjs.com/package/@insession/plugin-whiteboard-state)
+[`@insession/extension-whiteboard`](https://www.npmjs.com/package/@insession/extension-whiteboard)
 の `isOwnImageUrl` のような注入述語ではなく解決済みの boolean なのは、実際にはこの判断に I/O が
 要るからです — 自分のバケットの URL か、管理者が用意したスタンプセットか、このルームで有効か。
 Promise を返す述語にすると `reduce` 自体が async になってしまいます。そこで先に解決して答えを

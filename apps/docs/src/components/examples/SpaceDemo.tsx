@@ -10,7 +10,7 @@
 //  (a) plugin（pomodoro / whiteboard）は app-state で配られ、core が apps[appId] に格納する。
 //      各 plugin のクライアント面は PluginClient として core に差し込まれ、ログ行と効果音の
 //      effect だけを返す（core は plugin の名前も音色も知らない）
-//  (b) チャットは plugin ではなく core。chat-state が返す broadcast / chat-ack が、
+//  (b) チャットは plugin ではなく core。extension-chat が返す broadcast / chat-ack が、
 //      そのまま space-state の受信 case に噛み合う（送信者だけ ack を受け取る非対称も込み）
 //  (c) プレイヤー（watch-party）は **app-state ではない**。space-state の core は 'play' も
 //      'queue-update' も知らないので、受け側はアプリのプレイヤーが自分で持つ。境界の外側にも
@@ -21,8 +21,8 @@
 // ⚠ setState の updater の中で setTrace を呼ばないこと。updater は React に二度呼ばれうるので
 // （StrictMode の二重呼び出し）、トレースが重複して積まれる。state は素直に読んで使う。
 
-import type { PomodoroState } from '@insession/plugin-pomodoro-state';
-import type { WhiteboardState } from '@insession/plugin-whiteboard-state';
+import type { PomodoroState } from '@insession/extension-pomodoro';
+import type { WhiteboardState } from '@insession/extension-whiteboard';
 import {
   createSpaceStore,
   definePluginClient,
@@ -692,7 +692,7 @@ export default function SpaceDemo() {
           )}
         </div>
 
-        {/* ── チャット。plugin ではなく core なので、chat-state の broadcast が
+        {/* ── チャット。plugin ではなく core なので、extension-chat の broadcast が
              そのまま space-state の受信 case に噛み合う。 */}
         <div className="space-chatpane">
           <p className="demo-label">chat（{acting} の画面）</p>

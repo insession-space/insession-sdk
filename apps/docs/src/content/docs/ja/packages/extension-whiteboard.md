@@ -1,10 +1,10 @@
 ---
-title: '@insession/plugin-whiteboard-state'
+title: '@insession/extension-whiteboard'
 description: 依存ゼロの、サーバーを正とするホワイトボード状態機械。自由描画キャンバスと「お絵かき伝言ゲーム」が同居する。
 ---
 
 :::note[英語版が正です]
-このページは [英語版](/packages/plugin-whiteboard-state/) を訳したものです。英語版は npm に配布される
+このページは [英語版](/packages/extension-whiteboard/) を訳したものです。英語版は npm に配布される
 `README.md` から自動生成されており、内容が食い違う場合は**英語版が正**です。
 :::
 
@@ -44,7 +44,7 @@ strokes の配列に上限が無ければ際限なく増え続け、悪意ある
 ドメイン・署名方式を知りようがないので、推測しません — 代わりに述語を渡します:
 
 ```ts
-import { createWhiteboardState } from '@insession/plugin-whiteboard-state';
+import { createWhiteboardState } from '@insession/extension-whiteboard';
 
 const whiteboard = createWhiteboardState({
   isOwnImageUrl: (url) => url.startsWith('https://cdn.example.com/uploads/'),
@@ -65,11 +65,38 @@ const whiteboard = createWhiteboardState({
 ## インストール
 
 ```sh
-npm install @insession/plugin-whiteboard-state
+npm install @insession/extension-whiteboard
 ```
 
 ESM（`dist/index.js`）と CommonJS（`dist/index.cjs`）の両方のエントリポイントに `dist/index.d.ts` の型を
 添えたビルド済みパッケージとして配布され、ランタイム依存はありません。
+
+:::note[0.2.0 で改名しました]
+`@insession/plugin-whiteboard-state` から改名しました。旧名は npm 上で deprecated です。
+API は下記の `whiteboardExtension` が増えた以外に変更はありません。
+:::
+
+## スペースに載せる
+
+[`@insession/space`](/ja/packages/space/) でスペースを組み立てているなら、組み込みは1行です。
+extension が自分の名前・reducer・リレーのタイマー・永続化の規則をまとめて持っています。
+
+```ts
+import { createSpace } from '@insession/space';
+import { whiteboardExtension } from '@insession/extension-whiteboard';
+
+const space = createSpace({
+  extensions: [whiteboardExtension({ isOwnImageUrl: (url) => url.startsWith(MY_BUCKET) })],
+});
+
+space.dispatch('whiteboard', 'add-stroke', { stroke }); // -> [broadcast, clear-timer]
+```
+
+`isOwnImageUrl` がここでも必須なのは `createWhiteboardState` と同じ理由です（後述）。
+`{ name }` を渡せば別のキーを占有できます。
+
+このオブジェクトを作るのに `@insession/space` から何も import していません。あちらの
+`SpaceExtension` を**構造的に**満たしているだけなので、このパッケージは依存ゼロのままです。
 
 ## 使い方
 
@@ -77,7 +104,7 @@ ESM（`dist/index.js`）と CommonJS（`dist/index.cjs`）の両方のエント�
 import {
   createWhiteboardState,
   type WhiteboardState,
-} from '@insession/plugin-whiteboard-state';
+} from '@insession/extension-whiteboard';
 
 const whiteboard = createWhiteboardState({
   isOwnImageUrl: (url) => url.startsWith('https://cdn.example.com/uploads/'),
@@ -92,7 +119,7 @@ function onClientAction(action: string, payload: unknown) {
   const next = whiteboard.reduce(state, action, payload as Record<string, unknown>);
   if (!next) return; // 無効、または no-op — 何も変わっていないので配信するものも無い
   state = next;
-  broadcastToBoard({ type: 'plugin-whiteboard-state', state });
+  broadcastToBoard({ type: 'extension-whiteboard', state });
   scheduleRelayTimer();
 }
 
@@ -106,7 +133,7 @@ function scheduleRelayTimer() {
     const next = whiteboard.onTimer(state);
     if (!next) return;
     state = next;
-    broadcastToBoard({ type: 'plugin-whiteboard-state', state });
+    broadcastToBoard({ type: 'extension-whiteboard', state });
     scheduleRelayTimer();
   }, delay);
 }

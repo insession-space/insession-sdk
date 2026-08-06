@@ -1,4 +1,4 @@
-// Run with: node --test packages/plugin-watch-party-state
+// Run with: node --test packages/extension-watch-party
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

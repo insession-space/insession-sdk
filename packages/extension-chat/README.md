@@ -1,4 +1,4 @@
-# @insession/chat-state
+# @insession/extension-chat
 
 A **dependency-free, server-authoritative chat state machine**: message
 normalization, sticker validation, replies, per-message emoji reactions, a
@@ -54,21 +54,48 @@ property that makes this package worth having.
 ## Install
 
 ```sh
-npm install @insession/chat-state
+npm install @insession/extension-chat
 ```
 
 Published as a built package with both ESM (`dist/index.js`) and CommonJS
 (`dist/index.cjs`) entry points plus `dist/index.d.ts` types, no runtime
 dependencies.
 
+> Renamed from `@insession/chat-state` at 0.2.0. The old name is deprecated on
+> npm; the API is unchanged apart from the addition of `chatExtension` below.
+
+## Drop it into a space
+
+If you are assembling a space with
+[`@insession/space`](https://www.npmjs.com/package/@insession/space), the whole
+integration is one line — the extension carries its own name, reducer and
+persistence rules, and its effects arrive tagged with their origin:
+
+```ts
+import { createSpace } from '@insession/space';
+import { chatExtension } from '@insession/extension-chat';
+
+const space = createSpace({ extensions: [chatExtension()] });
+
+space.dispatch('chat', 'chat', { text, by: name, uid, stickerAllowed });
+// -> [broadcast, { type: 'extension', extension: 'chat', effect: { type: 'persist-chat', draft } }, clear-timer]
+```
+
+Every option `createChatState` takes is accepted here too, plus `{ name }` to
+occupy a different key.
+
+Nothing is imported from `@insession/space` to build that object: it satisfies
+that package's `SpaceExtension` structurally, so this package keeps its zero
+dependencies and everything below still works without it.
+
 ## Usage
 
 ```ts
-import { createChatState, type ChatEffect, type ChatState } from '@insession/chat-state';
+import { createChatState, type ChatEffect, type ChatState } from '@insession/extension-chat';
 
 const chat = createChatState();
 
-// One ChatState per room, e.g. a Map<roomId, ChatState>.
+// One ChatState per space, e.g. a Map<spaceId, ChatState>.
 let state: ChatState = chat.defaultState();
 
 // A client message arrives over your transport. `by`/`uid`/`avatar` come from
@@ -109,7 +136,7 @@ async function runEffects(sender: Member, effects: ChatEffect[]) {
         break;
       }
       case 'broadcast':
-        broadcastToRoom(effect.message, effect.excludeSender ? sender : undefined);
+        broadcastToSpace(effect.message, effect.excludeSender ? sender : undefined);
         break;
       case 'send-to-sender':
         sender.send(effect.message);
@@ -159,7 +186,7 @@ from the authenticated connection (and from your own storage, for
 client would let anyone claim any name or approve any image.
 
 `stickerAllowed` is a resolved boolean rather than an injected predicate — the
-way [`@insession/plugin-whiteboard-state`](https://www.npmjs.com/package/@insession/plugin-whiteboard-state)
+way [`@insession/extension-whiteboard`](https://www.npmjs.com/package/@insession/extension-whiteboard)
 takes `isOwnImageUrl` — because in practice deciding it needs I/O: is this URL
 in my bucket, is it an admin-managed sticker set, is it enabled for this room.
 A predicate that returns a promise would force `reduce` to be async. So you

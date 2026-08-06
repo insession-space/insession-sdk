@@ -30,13 +30,13 @@ plugin **固有**のもの（フェーズが切り替わったときのログ行
 渡した `definePluginClient` の記述子から出てきます。core は plugin の名前も文言も音色も
 知りません。`onAppState` を呼んで、返ってきたものをそのまま流すだけです。
 
-**チャットは plugin ではなく core。** `@insession/chat-state` はサーバー側で動き、その
+**チャットは plugin ではなく core。** `@insession/extension-chat` はサーバー側で動き、その
 `broadcast` / `send-to-sender` が `@insession/space-state` の既存の受信 case にそのまま
 噛み合います。**send text** を押してトレースを見てください: 送信者は broadcast から除外され、
 代わりに `chat-ack` を受け取ります。そこには、楽観的に出したローカル行に足りなかった id が
 載っています。別々に書かれた2つのパッケージが、`clientMsgId` でちょうど噛み合います。
 
-**プレイヤーは core の外に居る。** `@insession/plugin-watch-party-state` は `play` /
+**プレイヤーは core の外に居る。** `@insession/extension-watch-party` は `play` /
 `seek` / `queue-update` を broadcast しますが、`space-state` にはそのどれの case も
 **意図的に**ありません。プレイヤーはスペースの別チャンネルなので、ページ側が届いた
 メッセージを自分のビューへ射影します — 本物のプレイヤーコンポーネントがやっているのと

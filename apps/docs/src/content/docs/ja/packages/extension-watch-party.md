@@ -1,10 +1,10 @@
 ---
-title: '@insession/plugin-watch-party-state'
+title: '@insession/extension-watch-party'
 description: 依存ゼロの、サーバーを正とする Watch Party 状態機械。動画/音声の同期再生とキュー・履歴を持つ。
 ---
 
 :::note[英語版が正です]
-このページは [英語版](/packages/plugin-watch-party-state/) を訳したものです。英語版は npm に配布される
+このページは [英語版](/packages/extension-watch-party/) を訳したものです。英語版は npm に配布される
 `README.md` から自動生成されており、内容が食い違う場合は**英語版が正**です。
 :::
 
@@ -56,11 +56,37 @@ description: 依存ゼロの、サーバーを正とする Watch Party 状態機
 ## インストール
 
 ```sh
-npm install @insession/plugin-watch-party-state
+npm install @insession/extension-watch-party
 ```
 
 ESM（`dist/index.js`）と CommonJS（`dist/index.cjs`）の両方のエントリポイントに `dist/index.d.ts` の
 型を添えたビルド済みパッケージとして配布され、ランタイム依存はありません。
+
+:::note[0.4.0 で改名しました]
+`@insession/plugin-watch-party-state` から改名しました。旧名は npm 上で deprecated です。
+API は下記の `watchPartyExtension` が増えた以外に変更はありません。
+:::
+
+## スペースに載せる
+
+[`@insession/space`](/ja/packages/space/) でスペースを組み立てているなら、組み込みは1行です。
+extension が自分の名前・reducer・永続化の規則をまとめて持ち、effect には発生源が付いて届きます。
+
+```ts
+import { createSpace } from '@insession/space';
+import { watchPartyExtension } from '@insession/extension-watch-party';
+
+const space = createSpace({ extensions: [watchPartyExtension({ pickShuffleIndex })] });
+
+space.dispatch('watch-party', 'load-video', { videoId, by: name });
+// -> [broadcast, { type: 'extension', extension: 'watch-party', effect: { type: 'persist-playback', ... } }, clear-timer]
+```
+
+`createWatchParty` が受け取るオプションはすべてここでも渡せます。加えて `{ name }` で
+別のキーを占有できます。
+
+このオブジェクトを作るのに `@insession/space` から何も import していません。あちらの
+`SpaceExtension` を**構造的に**満たしているだけなので、このパッケージは依存ゼロのままです。
 
 ## 使い方
 
@@ -69,7 +95,7 @@ import {
   createWatchParty,
   type WatchPartyEffect,
   type WatchPartyState,
-} from '@insession/plugin-watch-party-state';
+} from '@insession/extension-watch-party';
 
 const watchParty = createWatchParty({
   // 任意: シャッフル有効時に候補をどう選ぶか。省略するとシャッフルは無効化されたのと同じに
