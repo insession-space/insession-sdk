@@ -1,5 +1,12 @@
 # @insession/docs
 
+## 0.0.8
+
+### Patch Changes
+
+- Updated dependencies [aa09386]
+  - @insession/extension-whiteboard@0.4.0
+
 ## 0.0.7
 
 ### Patch Changes
