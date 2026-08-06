@@ -1,35 +1,34 @@
 ---
 title: Getting started
-description: What the six @insession packages are, how they fit together, and which one to reach for first.
+description: What the @insession packages are, how they fit together, and which one to reach for first.
 ---
 
-The `@insession` SDK is six small packages pulled out of a production realtime
-app. They are independent enough that you can adopt one and ignore the rest.
+The `@insession` SDK is a set of small packages pulled out of a production
+realtime app. They are independent enough that you can adopt one and ignore the
+rest.
 
 | Package | What it does | Runtime dependencies |
 | --- | --- | --- |
 | [`@insession/ws-resilient-transport`](/packages/ws-resilient-transport/) | Keeps a WebSocket connected across deploys: fast reconnect on service restart, jittered backoff otherwise, terminal close codes that stop retrying. | none |
 | [`@insession/space-state`](/packages/space-state/) | Holds the state of a shared room — members, chat, presence, typing, plugins — as a pure reducer over inbound messages. | none |
-| [`@insession/space-state-react`](/packages/space-state-react/) | Binds the store to React via `useSyncExternalStore`. One hook. | `@insession/space-state` (+ `react` as a peer) |
 | [`@insession/extension-pomodoro`](/packages/extension-pomodoro/) | A server-authoritative Pomodoro timer state machine: pure `reduce`, plus `restore`/`persistState` for the storage boundary. | none |
 | [`@insession/extension-whiteboard`](/packages/extension-whiteboard/) | A server-authoritative Whiteboard state machine: shared free-draw strokes/shapes plus an optional "drawing telephone" relay game. | none |
 | [`@insession/extension-watch-party`](/packages/extension-watch-party/) | A server-authoritative Watch Party state machine: synchronized video/audio playback with a queue and history. `reduce` returns `{ state, effects }` — no I/O of its own. | none |
 
 ## How they fit together
 
-The only edge between them is `space-state-react` → `space-state`. The transport
-does **not** depend on the store, and the store does **not** depend on the
-transport:
+There are no edges between them at all. The transport does **not** depend on the
+store, and the store does **not** depend on the transport:
 
 ```
   your app
      │
-     ├── @insession/space-state-react ──> @insession/space-state
-     │                                          │
-     │                            store.onSend(msg) ──┐
-     │                            store.receive(msg) <┘
-     │                                          │
-     └── @insession/ws-resilient-transport ─────┘
+     ├── @insession/space-state
+     │              │
+     │    store.onSend(msg) ──┐
+     │    store.receive(msg) <┘
+     │              │
+     └── @insession/ws-resilient-transport
                 (you wire these two together)
 ```
 
@@ -44,8 +43,9 @@ store stays testable with no server and no browser at all.
   `ws-resilient-transport` alone. It knows nothing about rooms or state.
 - **You are modelling a shared room and want the state logic testable.** Take
   `space-state` alone, and keep your existing transport.
-- **Both, in a React app.** Take `ws-resilient-transport`, `space-state`, and
-  `space-state-react`.
+- **Both, in a React app.** Take `ws-resilient-transport` and `space-state`.
+  There is no React package: `getState` / `subscribe` are already shaped for
+  `useSyncExternalStore`, so the binding is one line you keep in your own code.
 - **You need a shared timer people can start, pause and skip together.** Take
   `extension-pomodoro` alone. It is a state machine only — bring your own transport
   and storage.
@@ -61,7 +61,7 @@ store stays testable with no server and no browser at all.
 ## Install
 
 ```sh
-npm install @insession/space-state @insession/space-state-react @insession/ws-resilient-transport
+npm install @insession/space-state @insession/ws-resilient-transport
 ```
 
 Every package ships as built ESM (`dist/index.js` + `dist/index.d.ts`) with
@@ -101,4 +101,4 @@ what they mean.
 
 - [`ws-resilient-transport`](/packages/ws-resilient-transport/) — every reconnect option, and what to do on the server
 - [`space-state`](/packages/space-state/) — the full store API, the effect list, and the plugin contract
-- [`space-state-react`](/packages/space-state-react/) — the hook, and why there is no `getServerSnapshot`
+- [React binding](/examples/react-binding/) — the one-line hook, and why there is no `getServerSnapshot`

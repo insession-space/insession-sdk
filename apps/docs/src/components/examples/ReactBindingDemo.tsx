@@ -1,20 +1,21 @@
-// @insession/space-state-react の実動作デモ。
+// SpaceStore を React に繋ぐときの実動作デモ。
 //
-// ⚠ 挙動を再実装しないこと。useSpaceState をそのまま使う。
+// ⚠ bail out の挙動を再実装しないこと。useSyncExternalStore（use-space-state.ts の1行の
+// フック）にそのまま任せる。
 //
-// このパッケージは実質10行しかないので、コードを見せるだけでは「本当にこれだけ？」で
-// 終わってしまう。代わりにレンダリング回数を出す — 同じ人の typing を連打しても2回目以降は
-// 再レンダリングされない。store が同一参照を返し useSyncExternalStore が bail out するからで、
-// これは薄いラッパーが契約を正しく満たしている証拠になる。
+// 繋ぎ込みは1行しかないので、コードを見せるだけでは「本当にこれだけ？」で終わってしまう。
+// 代わりにレンダリング回数を出す — 同じ人の typing を連打しても2回目以降は再レンダリング
+// されない。store が同一参照を返し useSyncExternalStore が bail out するからで、これは
+// store が契約を正しく満たしている証拠になる。
 //
 // ⚠ レンダリング回数は ChatPanel 自身の中で数え、memo で包むこと。親から数えようとすると、
 // 親の再レンダリング（トレースの更新）でも子が描き直されて回数が水増しされるうえ、
 // 「数えた結果を親の state に書く → 親が再描画 → 子も再描画」で無限ループになる。
 
 import { createSpaceStore, type SpaceStore } from '@insession/space-state';
-import { useSpaceState } from '@insession/space-state-react';
 import { memo, useRef, useState } from 'react';
 import { pushEntry, type TraceEntry, TraceList } from './Trace.tsx';
+import { useSpaceState } from './use-space-state.ts';
 
 function createDemoStore(): SpaceStore {
   return createSpaceStore({
@@ -63,7 +64,7 @@ const ChatPanel = memo(function ChatPanel({ store }: { store: SpaceStore }) {
   );
 });
 
-export default function SpaceStateReactDemo() {
+export default function ReactBindingDemo() {
   const storeRef = useRef<SpaceStore | null>(null);
   if (storeRef.current === null) storeRef.current = createDemoStore();
   const store = storeRef.current;
@@ -115,8 +116,8 @@ export default function SpaceStateReactDemo() {
   return (
     <div className="demo not-content">
       <div className="demo-bar">
-        <span>@insession/space-state-react</span>
-        <span className="demo-api">useSpaceState / useSyncExternalStore</span>
+        <span>@insession/space-state → React</span>
+        <span className="demo-api">useSyncExternalStore</span>
       </div>
       <div className="demo-body">
         <div className="demo-pane">

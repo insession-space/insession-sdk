@@ -1,0 +1,55 @@
+---
+title: 'React binding'
+description: A live demo of binding a SpaceStore to React with useSyncExternalStore, with the render count exposed so you can see it bail out.
+---
+
+import ReactBindingDemo from '../../../components/examples/ReactBindingDemo.tsx';
+
+There is no React package to install. `SpaceStore` already satisfies the
+`useSyncExternalStore` contract, so the entire binding is one line you write in
+your own codebase. Showing you that line proves nothing — so this demo shows the
+**render count** instead. Press `typing` twice for the same person: the second
+one does not re-render, because the store returns the same state reference and
+`useSyncExternalStore` bails out.
+
+<ReactBindingDemo client:only="react" />
+
+## What to try
+
+- Press **chat** a few times. Every message is a new state, so `<ChatPanel />`
+  re-renders each time and the count climbs with the received counter.
+- Press **typing (same person)** repeatedly. The first press re-renders (the
+  name is added to `typingUsers`); every press after that leaves the count
+  alone while `messages received` keeps going up. That gap is the whole point.
+- Press **chat** after a few `typing` presses. The indicator clears and the
+  panel re-renders — a real change still gets through.
+
+## The code behind it
+
+```tsx
+import { createSpaceStore, type SpaceState, type SpaceStore } from '@insession/space-state';
+import { useSyncExternalStore } from 'react';
+
+// This is the whole binding. Keep it wherever your other hooks live.
+function useSpaceState(store: SpaceStore): SpaceState {
+  return useSyncExternalStore(store.subscribe, store.getState);
+}
+
+const store = createSpaceStore({ selfName: 'you', t: (k) => k, getPresence: () => 'active' });
+
+function ChatPanel() {
+  const state = useSpaceState(store);
+  return <ul>{state.chatLines.map((line) => <li key={line.id}>{line.text}</li>)}</ul>;
+}
+```
+
+That is the entire integration. The bail-out behaviour is not implemented in
+that hook — it comes from the store honouring the `useSyncExternalStore`
+contract (`getState()` returns the same reference while nothing has changed).
+
+No `getServerSnapshot` is passed here because the store's state presupposes a
+live browser connection, so there is nothing meaningful to render on a server.
+If you do server-render, pass your own initial state as the third argument.
+
+See the [`space-state` reference](/packages/space-state/) for `getState` /
+`subscribe` and the rest of the store surface.

@@ -1,31 +1,30 @@
 ---
 title: はじめかた
-description: 3つの @insession パッケージが何で、どう噛み合い、最初にどれを取ればよいか。
+description: '@insession のパッケージが何で、どう噛み合い、最初にどれを取ればよいか。'
 ---
 
-`@insession` SDK は、本番稼働中のリアルタイムアプリから切り出した小さなパッケージ3つです。
+`@insession` SDK は、本番稼働中のリアルタイムアプリから切り出した小さなパッケージ群です。
 互いに独立しているので、1つだけ採用して残りを無視できます。
 
 | パッケージ | 何をするか | ランタイム依存 |
 | --- | --- | --- |
 | [`@insession/ws-resilient-transport`](/ja/packages/ws-resilient-transport/) | デプロイを跨いで WebSocket を繋ぎ続ける。サービス再起動時は高速再接続、それ以外はジッター付きバックオフ、terminal な close code では再接続を止める。 | なし |
 | [`@insession/space-state`](/ja/packages/space-state/) | 共有ルームの状態（メンバー・チャット・プレゼンス・入力中・プラグイン）を、受信メッセージに対する純粋 reducer として持つ。 | なし |
-| [`@insession/space-state-react`](/ja/packages/space-state-react/) | store を `useSyncExternalStore` 経由で React に繋ぐ。フック1つ。 | `@insession/space-state`（+ peer に `react`） |
 
 ## どう噛み合うか
 
-3つの間にある依存は `space-state-react` → `space-state` の1本だけです。トランスポートは store に
-依存**せず**、store もトランスポートに依存**しません**。
+パッケージ間の依存は1本もありません。トランスポートは store に依存**せず**、store も
+トランスポートに依存**しません**。
 
 ```
   あなたのアプリ
      │
-     ├── @insession/space-state-react ──> @insession/space-state
-     │                                          │
-     │                            store.onSend(msg) ──┐
-     │                            store.receive(msg) <┘
-     │                                          │
-     └── @insession/ws-resilient-transport ─────┘
+     ├── @insession/space-state
+     │              │
+     │    store.onSend(msg) ──┐
+     │    store.receive(msg) <┘
+     │              │
+     └── @insession/ws-resilient-transport
                 （この2つを繋ぐのはあなた）
 ```
 
@@ -39,12 +38,14 @@ description: 3つの @insession パッケージが何で、どう噛み合い、
   ルームや状態のことは何も知りません。
 - **共有ルームをモデル化したくて、状態のロジックをテスト可能にしたい** → `space-state` だけを取り、
   トランスポートは今のものを使い続けられます。
-- **React アプリで両方** → 3つとも。
+- **React アプリで両方** → `ws-resilient-transport` と `space-state` の2つ。React 用の
+  パッケージはありません。`getState` / `subscribe` は既に `useSyncExternalStore` の形に
+  合わせてあるので、繋ぎ込みは自分のコードに置く1行で足ります。
 
 ## インストール
 
 ```sh
-npm install @insession/space-state @insession/space-state-react @insession/ws-resilient-transport
+npm install @insession/space-state @insession/ws-resilient-transport
 ```
 
 どのパッケージもビルド済み ESM（`dist/index.js` + `dist/index.d.ts`）で配布され、TypeScript の型を
@@ -83,4 +84,4 @@ store が要求する副作用（音・通知・タイマー）は `store.onEffe
 
 - [`ws-resilient-transport`](/ja/packages/ws-resilient-transport/) — 再接続オプションの全体と、サーバー側ですべきこと
 - [`space-state`](/ja/packages/space-state/) — store の API 全体、effect の一覧、plugin の契約
-- [`space-state-react`](/ja/packages/space-state-react/) — フックと、`getServerSnapshot` を渡さない理由
+- [React バインディング](/ja/examples/react-binding/) — 1行のフックと、`getServerSnapshot` を渡さない理由

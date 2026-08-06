@@ -44,9 +44,6 @@ importers:
       '@insession/space-state':
         specifier: workspace:*
         version: link:../../packages/space-state
-      '@insession/space-state-react':
-        specifier: workspace:*
-        version: link:../../packages/space-state-react
       astro:
         specifier: ^5.14.0
         version: 5.18.2(@types/node@24.13.3)(lightningcss@1.33.0)(rollup@4.62.4)(typescript@5.9.3)(yaml@2.9.0)
@@ -120,25 +117,6 @@ importers:
 
   packages/space-state:
     devDependencies:
-      tsup:
-        specifier: ^8.3.5
-        version: 8.5.1(postcss@8.5.25)(typescript@5.9.3)(yaml@2.9.0)
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-
-  packages/space-state-react:
-    dependencies:
-      '@insession/space-state':
-        specifier: workspace:*
-        version: link:../space-state
-    devDependencies:
-      '@types/react':
-        specifier: ^19.2.0
-        version: 19.2.18
-      react:
-        specifier: ^19.2.7
-        version: 19.2.8
       tsup:
         specifier: ^8.3.5
         version: 8.5.1(postcss@8.5.25)(typescript@5.9.3)(yaml@2.9.0)

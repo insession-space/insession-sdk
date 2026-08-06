@@ -29,7 +29,6 @@ import {
   type SpaceEffect,
   type SpaceStore,
 } from '@insession/space-state';
-import { useSpaceState } from '@insession/space-state-react';
 import { useEffect, useRef, useState } from 'react';
 import {
   createDemoHost,
@@ -43,6 +42,7 @@ import {
   VIDEOS,
 } from './space-demo-host.ts';
 import { pushEntry, type TraceEntry, TraceList } from './Trace.tsx';
+import { useSpaceState } from './use-space-state.ts';
 
 /** space-state の core が受信 case を持つメッセージ。これ以外はプレイヤー面へ回す。 */
 const CORE_MESSAGE_TYPES = new Set([
@@ -440,7 +440,7 @@ export default function SpaceDemo() {
     <div className="demo not-content">
       <div className="demo-bar">
         <span>@insession/* — one space</span>
-        <span className="demo-api">space-state / space-state-react / 4 state machines</span>
+        <span className="demo-api">space-state / 4 state machines</span>
       </div>
 
       <div className="demo-pane">

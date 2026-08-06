@@ -58,22 +58,6 @@ hero:
   </div>
 
   <div class="pkg-card">
-    <h3>@insession/space-state-react</h3>
-    <p>
-      The React binding for <code>space-state</code>: one hook over
-      <code>useSyncExternalStore</code>, about ten lines, no logic of its own.
-    </p>
-    <div class="pkg-tags">
-      <span class="pkg-tag">1 hook</span>
-      <span class="pkg-tag">react peer</span>
-    </div>
-    <div class="pkg-links">
-      <a href="/packages/space-state-react/">Docs</a>
-      <a href="https://www.npmjs.com/package/@insession/space-state-react">npm</a>
-    </div>
-  </div>
-
-  <div class="pkg-card">
     <h3>@insession/extension-pomodoro</h3>
     <p>
       A server-authoritative Pomodoro timer state machine: a pure <code>reduce</code> over
@@ -125,10 +109,11 @@ hero:
 </div>
 
 <p class="dep-note">
-  Only one edge between them: <code>space-state-react</code> → <code>space-state</code>.
-  <code>ws-resilient-transport</code>, <code>extension-pomodoro</code>,
-  <code>extension-whiteboard</code>, and <code>extension-watch-party</code> are independent
-  — carrying bytes and holding state are kept apart on purpose, so you can adopt any one alone.
+  No edges between them at all. <code>space-state</code>, <code>ws-resilient-transport</code>,
+  <code>extension-pomodoro</code>, <code>extension-whiteboard</code>, and
+  <code>extension-watch-party</code> are each independent — carrying bytes and holding state are
+  kept apart on purpose, so you can adopt any one alone. Using React? There is no binding package
+  to install: <a href="/examples/react-binding/">one line of your own</a> is the whole hook.
 </p>
 
 ## Why these
