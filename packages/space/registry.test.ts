@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import {
   createExtensionRegistry,
   defineSpaceExtension,
-  type RoomState,
+  type ExtensionState,
   type SpaceEffect,
   type SpaceExtension,
 } from './index.ts';
@@ -331,7 +331,7 @@ test('applyTimer is null when the extension has no onTimer or is unknown', () =>
 
 test('persist strips session-only fields and leaves other slices alone', () => {
   const r = registry();
-  const state: RoomState = {
+  const state: ExtensionState = {
     ...r.initState(),
     counter: { count: 5, running: false, endsAt: null, viewers: ['a'] },
   };

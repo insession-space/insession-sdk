@@ -8,7 +8,7 @@
 
 | ディレクトリ | パッケージ | 内容 | 依存 |
 | --- | --- | --- | --- |
-| `packages/space-extension` | `@insession/space-extension` | 依存ゼロの extension 契約（`defineSpaceExtension`）と集約 registry（`createExtensionRegistry`）。1つの定義が server 面（reducer）と client 面（畳み込み）を両方持ち、registry が action のルーティング・タイマーの張り直し・永続化の入出力を担う | **なし** |
+| `packages/space` | `@insession/space` | **space の親。** ヘッドレスなスペースを extension の集合として組み立てるエンジン。extension 契約（`defineSpaceExtension`）・集約 registry（`createExtensionRegistry`）・room ライフサイクル（members / presence / 入退室。`room.ts`）・インスタンス（`createSpace`）を持つ。I/O は一切行わず effect 記述子を返すだけで、WS とストレージは利用者が自前で持つ | **なし** |
 | `packages/ws-resilient-transport` | `@insession/ws-resilient-transport` | 本番デプロイの都合に合わせて再接続する WebSocket トランスポート（サービス再起動時の高速再接続 / ジッター付き指数バックオフ / terminal close code） | **なし** |
 | `packages/space-state` | `@insession/space-state` | transport・フレームワーク非依存のスペース状態 store。受信は純粋 reducer、送信は `onSend` に流すだけ、副作用は effect 記述子で返すだけ | **なし** |
 | `packages/space-state-react` | `@insession/space-state-react` | 上を React の `useSyncExternalStore` に繋ぐ薄いラッパー（1関数） | `space-state` / peer に `react` |
@@ -17,11 +17,15 @@
 | `packages/plugin-watch-party-state` | `@insession/plugin-watch-party-state` | 依存ゼロの Watch Party（動画/音声の同期再生）状態機械（server-authoritative。`reduce` は `{ state, effects }` を返す純関数で、broadcast/永続化/タイトル解決は effect 記述子としてホストに委ねる） | **なし** |
 | `packages/chat-state` | `@insession/chat-state` | 依存ゼロのチャット状態機械（server-authoritative。メッセージの正規化・スタンプ検証・返信・リアクション・ピン留め。`reduce` は `{ state, effects }` を返す純関数で、永続化/broadcast/bot 通知は effect 記述子としてホストに委ねる） | **なし** |
 
-**依存の向きは `space-state-react` → `space-state` の一方向だけ。** `space-extension` / `ws-resilient-transport` と `plugin-pomodoro-state` / `plugin-whiteboard-state` / `plugin-watch-party-state` / `chat-state` は完全に独立していて、他のパッケージと繋がっていない（transport と状態管理を分けているのが設計の要点なので、ここに依存を足さない）。
+**依存の向きは `space-state-react` → `space-state` の一方向だけ。** `space` / `ws-resilient-transport` と `plugin-pomodoro-state` / `plugin-whiteboard-state` / `plugin-watch-party-state` / `chat-state` は完全に独立していて、他のパッケージと繋がっていない（transport と状態管理を分けているのが設計の要点なので、ここに依存を足さない）。
 
-**⚠ `space-extension` が状態機械パッケージに依存しないのは意図的。** 契約層が特定の実装を import すると「どの状態機械を使うか」を契約が決めてしまう。`space-extension` は既存4つが**既に満たしている形**（`defaultState` / `reduce` / `timerDelay` / `onTimer` / `restore` / `persistState`）を型として言語化しただけなので、消費側が `defineSpaceExtension({ name, server: <既存パッケージの API> })` と書けば構造的に嵌る。逆向き（状態機械側が `space-extension` を import する）も同じ理由で足さないこと — 依存ゼロが売りのパッケージにランタイム依存が1つ増える。
+**⚠ `space` が状態機械パッケージに依存しないのは意図的。** 親パッケージが特定の実装を import すると「どの状態機械を使うか」を契約側が決めてしまう。`space` は既存4つが**既に満たしている形**（`defaultState` / `reduce` / `timerDelay` / `onTimer` / `restore` / `persistState`）を型として言語化しただけなので、消費側が `defineSpaceExtension({ name, server: <既存パッケージの API> })` と書けば構造的に嵌る。逆向き（状態機械側が `space` を import する）も同じ理由で足さないこと — 依存ゼロが売りのパッケージにランタイム依存が1つ増える。
 
-**「依存ゼロ」は `space-extension` / `ws-resilient-transport` / `space-state` / `plugin-pomodoro-state` / `plugin-whiteboard-state` / `plugin-watch-party-state` / `chat-state` の売り。** 便利だからという理由でランタイム依存を1つでも足すと、このパッケージを選ぶ理由が消える。足したくなったら、まずそれが本当にこのリポジトリに置くべきものかを下記「入れるもの / 入れないもの」で判断すること。
+**⚠ `space` を細かく割らないこと。** 契約・registry・room・インスタンスは1パッケージに同居させる。**これらは必ず一緒に変わる**ので、別採番にすると契約にフィールドを1つ足すたびに2パッケージ2版の組み合わせが増え、消費側が版合わせを強いられる。加えて、契約だけを単体で install する人は居ない（それだけでは space が建たない）。**単体で install されないものはパッケージにしない。** `@tiptap/core` が `Editor` と `Extension` を同居させているのと同じ判断。
+
+**⚠ `space-core` という名前を使わないこと。** `insession-app` に `@in-session/space-core`（React・UI 込み・private）が実在する。ハイフン1つしか違わないのに責務が正反対で、しかも `insession-app` では**両方が同時にインストールされる**。補完で選び間違えても型が合うまで気づけない。
+
+**「依存ゼロ」は `space` / `ws-resilient-transport` / `space-state` / `plugin-pomodoro-state` / `plugin-whiteboard-state` / `plugin-watch-party-state` / `chat-state` の売り。** 便利だからという理由でランタイム依存を1つでも足すと、このパッケージを選ぶ理由が消える。足したくなったら、まずそれが本当にこのリポジトリに置くべきものかを下記「入れるもの / 入れないもの」で判断すること。
 
 ## 開発の仕方
 

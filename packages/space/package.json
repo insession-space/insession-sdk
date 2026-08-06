@@ -1,0 +1,62 @@
+{
+  "name": "@insession/space",
+  "version": "0.1.0",
+  "description": "A dependency-free engine for headless realtime spaces: bring your own WebSocket server and storage, and this owns who is in the room, which extension owns which slice of its state, how actions reach the right reducer, and when timers need re-arming. Every transition returns effect descriptors instead of performing I/O.",
+  "//": "このパッケージが space の親。extension 契約（defineSpaceExtension）・集約 registry・room ライフサイクル（members/presence）・インスタンス（createSpace）を1つに持つ。契約だけを別パッケージに切らないのは、契約とそれを消費する registry/room が必ず一緒に変わるため（別採番にすると1フィールド足すたびに2パッケージ2版の組み合わせが増える）。@tiptap/core が Editor と Extension を同居させているのと同じ判断。",
+  "//name": "名前を space-core にしないこと。insession-app に @in-session/space-core（React・UI 込み・private）が実在し、ハイフン1つしか違わないうえ責務が正反対で、しかも insession-app では両方が同時にインストールされる。",
+  "//exports": "ESM に加えて CJS も出しているのは、消費者である insession-app のサーバーが .ts を直接実行しており require() で読むため。ESM only にすると require が壊れる(plugin-*-state / chat-state と同じ理由)。",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "headless",
+    "realtime",
+    "space",
+    "room",
+    "extension",
+    "presence",
+    "state-machine",
+    "reducer"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/insession-space/insession-sdk.git",
+    "directory": "packages/space"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "module": "./dist/index.js",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "//publishConfig": "registry を明示するのは必須。開発機の ~/.npmrc が社内プロキシを registry に設定している場合、これが無いと npm publish がプロキシ宛になり公開レジストリへ出ない（design-system と同じ理由）。",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "node --test",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "//dependencies": "依存ゼロ。状態機械パッケージ（plugin-*-state / chat-state）も import しない — 契約層が特定の実装を import すると『どの状態機械を使うか』を契約が決めてしまう。既存パッケージは構造的に嵌るので import は不要。",
+  "dependencies": {},
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0"
+  }
+}

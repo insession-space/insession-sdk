@@ -109,7 +109,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/space-extension:
+  packages/space:
     devDependencies:
       tsup:
         specifier: ^8.3.5
