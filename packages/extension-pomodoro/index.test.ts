@@ -3,13 +3,25 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   defaultState,
-  onTimer,
+  onTimer as onTimerWithEffects,
+  type PomodoroPayload,
   type PomodoroState,
   persistState,
-  reduce,
+  reduce as reduceWithEffects,
   restore,
   timerDelay,
 } from './index.ts';
+
+// `reduce`/`onTimer` return `{ state, effects }`. The assertions below are
+// about the state transition, so they go through these unwrapping shims;
+// the effects themselves are asserted directly in the "Effects" section at
+// the bottom of this file.
+const reduce = (
+  state: PomodoroState | null | undefined,
+  action: string,
+  payload?: PomodoroPayload,
+): PomodoroState | null => reduceWithEffects(state, action, payload)?.state ?? null;
+const onTimer = (state: PomodoroState): PomodoroState => onTimerWithEffects(state).state;
 
 // Every test that depends on Date.now() replaces it for the duration of the
 // test and restores it afterwards, so timing is deterministic.
@@ -559,4 +571,105 @@ test('restore: a __proto__ member name becomes an own key, not a prototype swap'
   assert.deepEqual(Object.keys(back.declarations), ['__proto__']);
   // Nothing leaked onto the global prototype.
   assert.equal(({} as Record<string, unknown>).text, undefined);
+});
+
+// ── Effects ────────────────────────────────────────────────────────────────
+//
+// Declarations are the only thing here that outlives a session, so they are
+// the only source of effects. Everything else changes state and nothing else.
+
+test('declare by a signed-in member asks the host to store it', () => {
+  const r = reduceWithEffects(defaultState(), 'declare', {
+    by: 'Ada',
+    uid: 'u1',
+    text: 'ship the thing',
+  });
+  assert.ok(r);
+  assert.deepEqual(r.effects, [{ type: 'persist-declaration', uid: 'u1', text: 'ship the thing' }]);
+});
+
+test('a guest declaration is state-only: nothing is stored', () => {
+  // By design — a guest has no account to key storage by.
+  const r = reduceWithEffects(defaultState(), 'declare', { by: 'Anon', text: 'lurking' });
+  assert.ok(r);
+  assert.equal(r.state.declarations.Anon.text, 'lurking');
+  assert.deepEqual(r.effects, []);
+});
+
+test('clearing a declaration asks the host to delete it', () => {
+  const declared = reduceWithEffects(defaultState(), 'declare', {
+    by: 'Ada',
+    uid: 'u1',
+    text: 'ship it',
+  });
+  assert.ok(declared);
+  const cleared = reduceWithEffects(declared.state, 'declare', { by: 'Ada', uid: 'u1', text: '' });
+  assert.ok(cleared);
+  assert.equal(cleared.state.declarations.Ada, undefined);
+  assert.deepEqual(cleared.effects, [{ type: 'delete-declaration', uid: 'u1' }]);
+});
+
+test('clearing a guest declaration stores nothing and deletes nothing', () => {
+  const declared = reduceWithEffects(defaultState(), 'declare', { by: 'Anon', text: 'x' });
+  assert.ok(declared);
+  const cleared = reduceWithEffects(declared.state, 'declare', { by: 'Anon', text: '' });
+  assert.ok(cleared);
+  assert.deepEqual(cleared.effects, []);
+});
+
+test('attaching a uid to an existing text stores it, and keeps the cheers', () => {
+  // The text is unchanged, so cheers survive — but storage has not seen this
+  // declaration before, so it still has to be written.
+  const guest = reduceWithEffects(defaultState(), 'declare', { by: 'Ada', text: 'same text' });
+  assert.ok(guest);
+  const cheered = reduceWithEffects(guest.state, 'cheer', { by: 'Bob', target: 'Ada' });
+  assert.ok(cheered);
+  assert.deepEqual(cheered.effects, [], 'cheering never touches storage');
+
+  const signedIn = reduceWithEffects(cheered.state, 'declare', {
+    by: 'Ada',
+    uid: 'u1',
+    text: 'same text',
+  });
+  assert.ok(signedIn);
+  assert.deepEqual(signedIn.state.declarations.Ada.cheers, ['Bob']);
+  assert.deepEqual(signedIn.effects, [
+    { type: 'persist-declaration', uid: 'u1', text: 'same text' },
+  ]);
+});
+
+test('re-declaring the identical text and uid is a no-op, so nothing is stored', () => {
+  const first = reduceWithEffects(defaultState(), 'declare', { by: 'Ada', uid: 'u1', text: 'x' });
+  assert.ok(first);
+  // The reducer rejects it outright, which is also "no write".
+  assert.equal(
+    reduceWithEffects(first.state, 'declare', { by: 'Ada', uid: 'u1', text: 'x' }),
+    null,
+  );
+});
+
+test('phase changes produce no effects, from either entry point', () => {
+  const declared = reduceWithEffects(defaultState(), 'declare', {
+    by: 'Ada',
+    uid: 'u1',
+    text: 'x',
+  });
+  assert.ok(declared);
+  const started = reduceWithEffects(declared.state, 'start');
+  assert.ok(started);
+  assert.deepEqual(started.effects, []);
+  assert.deepEqual(onTimerWithEffects(started.state).effects, []);
+});
+
+test('a wire-controlled member name cannot reach an inherited declaration', () => {
+  // Same guard as the reducer's: `Object.hasOwn`, not a bare lookup. Without
+  // it, `by: 'constructor'` would compare against Object.prototype.constructor
+  // and could emit a bogus effect.
+  const r = reduceWithEffects(defaultState(), 'declare', {
+    by: 'constructor',
+    uid: 'u1',
+    text: 'hi',
+  });
+  assert.ok(r);
+  assert.deepEqual(r.effects, [{ type: 'persist-declaration', uid: 'u1', text: 'hi' }]);
 });

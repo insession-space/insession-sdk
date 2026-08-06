@@ -65,14 +65,17 @@ export default function WhiteboardDemo() {
     const call = payload
       ? `reduce(state, '${action}', ${JSON.stringify(payload)})`
       : `reduce(state, '${action}')`;
-    const next = wb.reduce(state, action, payload);
-    if (next === null) {
+    const result = wb.reduce(state, action, payload);
+    if (result === null) {
       // null は「無効・no-op なので無視する」。握り潰さずそのまま見せる。
       setTrace((t) =>
         pushEntry(t, { call, ret: 'null — invalid or a no-op, ignore it', noop: true }),
       );
       return;
     }
+    // reduce は { state, effects } を返す。このデモはリレー履歴の永続化
+    // （effects の中身）までは扱わないので state だけ取る。
+    const next = result.state;
     const delay = wb.timerDelay(next);
     setState(next);
     setTrace((t) =>
@@ -91,8 +94,9 @@ export default function WhiteboardDemo() {
     const delay = wb.timerDelay(state);
     if (delay === null) return;
     const id = setTimeout(() => {
-      const next = wb.onTimer(state);
-      if (!next) return;
+      const fired = wb.onTimer(state);
+      if (!fired) return;
+      const next = fired.state;
       setState(next);
       setTrace((t) =>
         pushEntry(t, { call: 'timerDelay elapsed → onTimer(state)', ret: summarize(next) }),

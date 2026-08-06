@@ -46,14 +46,17 @@ export default function PomodoroDemo() {
     const call = payload
       ? `reduce(state, '${action}', ${JSON.stringify(payload)})`
       : `reduce(state, '${action}')`;
-    const next = reduce(state, action, payload);
-    if (next === null) {
+    const result = reduce(state, action, payload);
+    if (result === null) {
       // null は「無効・no-op なので無視する」。握り潰さずそのまま見せる。
       setTrace((t) =>
         pushEntry(t, { call, ret: 'null — invalid or a no-op, ignore it', noop: true }),
       );
       return;
     }
+    // reduce は { state, effects } を返す。このデモは宣言の永続化（effects の
+    // 中身）までは扱わないので state だけ取る。
+    const next = result.state;
     const delay = timerDelay(next);
     setState(next);
     setTrace((t) =>
@@ -72,7 +75,7 @@ export default function PomodoroDemo() {
     const delay = timerDelay(state);
     if (delay === null) return;
     const id = setTimeout(() => {
-      const next = onTimer(state);
+      const next = onTimer(state).state;
       setState(next);
       setTrace((t) =>
         pushEntry(t, { call: 'timerDelay elapsed → onTimer(state)', ret: summarize(next) }),

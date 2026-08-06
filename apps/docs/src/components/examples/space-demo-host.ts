@@ -169,10 +169,13 @@ export function createDemoHost() {
     payload: Record<string, unknown> | undefined,
     call: string,
   ): HostOutcome {
-    const next = pomodoroReduce(pomodoro, action, payload);
-    if (next === null) {
+    const result = pomodoroReduce(pomodoro, action, payload);
+    if (result === null) {
       return { deliveries: [], steps: [{ call, ret: 'null — 無効か no-op。捨てる', noop: true }] };
     }
+    // reduce は { state, effects } を返す。このデモは宣言の永続化（effects の
+    // 中身）までは扱わないので state だけ取る。
+    const next = result.state;
     pomodoro = next;
     const delay = pomodoroTimerDelay(next);
     return {
@@ -195,10 +198,13 @@ export function createDemoHost() {
     payload: Record<string, unknown> | undefined,
     call: string,
   ): HostOutcome {
-    const next = whiteboardApi.reduce(whiteboard, action, payload);
-    if (next === null) {
+    const result = whiteboardApi.reduce(whiteboard, action, payload);
+    if (result === null) {
       return { deliveries: [], steps: [{ call, ret: 'null — 無効か no-op。捨てる', noop: true }] };
     }
+    // reduce は { state, effects } を返す。このデモはリレー履歴の永続化
+    // （effects の中身）までは扱わないので state だけ取る。
+    const next = result.state;
     whiteboard = next;
     return {
       deliveries: [{ message: { type: 'app-state', appId: 'whiteboard', state: next } }],
@@ -466,7 +472,7 @@ export function createDemoHost() {
   }
 
   function firePomodoroTimer(): HostOutcome {
-    const next = pomodoroOnTimer(pomodoro);
+    const next = pomodoroOnTimer(pomodoro).state;
     pomodoro = next;
     return {
       deliveries: [{ message: { type: 'app-state', appId: 'pomodoro', state: next } }],
