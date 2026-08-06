@@ -601,11 +601,30 @@ function submitToChain(
 /**
  * The API returned by `createWhiteboardState`.
  */
+/**
+ * A side effect for the host to run.
+ *
+ * A finished relay game is the one thing here worth keeping past the session:
+ * the album is the payoff, and it disappears when the space empties.
+ */
+export type WhiteboardEffect = {
+  type: 'persist-relay-history';
+  players: string[];
+  chains: RelayChainEntry[][];
+};
+
+/** What `reduce`/`onTimer` return when they accept an action. */
+export interface WhiteboardReduceResult {
+  state: WhiteboardState;
+  effects: WhiteboardEffect[];
+}
+
 export interface WhiteboardStateApi {
   defaultState: () => WhiteboardState;
   /**
-   * Applies an action to the current state, returning the next state or
-   * `null` if the action is invalid/a no-op and should be ignored.
+   * Applies an action to the current state, returning the next state plus any
+   * effects for the host to run, or `null` if the action is invalid/a no-op
+   * and should be ignored entirely.
    *
    * `action` is typed as `string` rather than `WhiteboardAction` on purpose:
    * this function sits behind a wire boundary where the action name is
@@ -616,7 +635,7 @@ export interface WhiteboardStateApi {
     state: WhiteboardState | null | undefined,
     action: string,
     payload?: WhiteboardPayload,
-  ) => WhiteboardState | null;
+  ) => WhiteboardReduceResult | null;
   /**
    * Milliseconds until the next event (a relay phase expiring), or `null` if
    * there's nothing to wait for.
@@ -626,7 +645,7 @@ export interface WhiteboardStateApi {
    * Called when a relay phase expires: fills a placeholder entry for every
    * player who hasn't submitted, then advances the round.
    */
-  onTimer: (state: WhiteboardState) => WhiteboardState | null;
+  onTimer: (state: WhiteboardState) => WhiteboardReduceResult | null;
   /**
    * Normalizes state loaded from storage into a safe shape. `null` only for
    * non-object input. `mode` always comes back `'free'` and `game` always
@@ -685,7 +704,7 @@ export function createWhiteboardState(options: {
     return typeof v === 'string' && isOwnImageUrl(v) ? v : null;
   }
 
-  function reduce(
+  function reduceState(
     state: WhiteboardState | null | undefined,
     action: string,
     payload?: WhiteboardPayload,
@@ -859,7 +878,7 @@ export function createWhiteboardState(options: {
     return Math.max(0, endsAt + TIMEOUT_GRACE_MS - Date.now());
   }
 
-  function onTimer(state: WhiteboardState): WhiteboardState | null {
+  function advanceOnTimer(state: WhiteboardState): WhiteboardState | null {
     const game = state.game;
     if (!game) return null;
     const phase = game.phase;
@@ -899,6 +918,37 @@ export function createWhiteboardState(options: {
     // choice `restore` implementations elsewhere in this SDK make for
     // playback position and running timers.
     return { strokes, shapes, version, mode: 'free', game: null };
+  }
+
+  // A finished relay is the one thing here worth keeping past the session:
+  // the album (who drew what, in which order) is the payoff, and it is gone
+  // the moment the space empties. Only the transition knows the round just
+  // ended, so it says so and the host performs the write.
+  //
+  // Fired exactly once per game, on the edge into `album` — `reset-game`
+  // returns to the lobby, so a rematch produces its own single effect.
+  function relayFinishedEffects(prev: WhiteboardState, next: WhiteboardState): WhiteboardEffect[] {
+    const game = next.game;
+    if (!game || game.phase !== 'album') return [];
+    if (prev.game?.phase === 'album') return [];
+    return [{ type: 'persist-relay-history', players: game.players, chains: game.chains }];
+  }
+
+  function reduce(
+    state: WhiteboardState | null | undefined,
+    action: string,
+    payload?: WhiteboardPayload,
+  ): WhiteboardReduceResult | null {
+    const prev = state || defaultState();
+    const next = reduceState(state, action, payload);
+    if (next === null) return null;
+    return { state: next, effects: relayFinishedEffects(prev, next) };
+  }
+
+  function onTimer(state: WhiteboardState): WhiteboardReduceResult | null {
+    const next = advanceOnTimer(state);
+    if (next === null) return null;
+    return { state: next, effects: relayFinishedEffects(state, next) };
   }
 
   return { defaultState, reduce, timerDelay, onTimer, restore };

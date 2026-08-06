@@ -177,7 +177,7 @@ function advance(state: PomodoroState, completed: boolean): PomodoroState {
  * breaking the type this module publishes. Hosts are expected to inject `by`
  * themselves from the authenticated member rather than trusting the wire.
  */
-export function reduce(
+function reduceState(
   state: PomodoroState | null | undefined,
   action: string,
   payload?: PomodoroPayload,
@@ -293,6 +293,77 @@ export function reduce(
 }
 
 /**
+ * A side effect for the host to run.
+ *
+ * Declarations are the one thing here that outlives a session: a member's
+ * one-liner is meant to come back when they rejoin, so it belongs in the
+ * host's storage keyed by member and space. Which member changed, and to
+ * what, is something only the transition knows — so `reduce` says it, and the
+ * host performs the write.
+ *
+ * Only *signed-in* members produce effects. A guest's declaration lives in
+ * state and nowhere else, by design.
+ */
+export type PomodoroEffect =
+  /** Store (or overwrite) this member's declaration text. */
+  | { type: 'persist-declaration'; uid: string; text: string }
+  /** The member cleared their declaration; remove the stored one. */
+  | { type: 'delete-declaration'; uid: string };
+
+/** What `reduce`/`onTimer` return when they accept an action. */
+export interface PomodoroReduceResult {
+  state: PomodoroState;
+  effects: PomodoroEffect[];
+}
+
+/**
+ * The declaration writes implied by a transition.
+ *
+ * Only `declare` can produce them: `cheer` touches `declarations` too, but
+ * cheers are not stored, and every other action leaves declarations alone.
+ * Comparing just the acting member's entry is enough for the same reason —
+ * an action can only change their own.
+ */
+function declarationEffects(
+  prev: PomodoroState,
+  next: PomodoroState,
+  action: string,
+  payload?: PomodoroPayload,
+): PomodoroEffect[] {
+  if (action !== 'declare') return [];
+  const by = typeof payload?.by === 'string' ? payload.by : null;
+  if (!by) return [];
+  const before = Object.hasOwn(prev.declarations, by) ? prev.declarations[by] : undefined;
+  const after = Object.hasOwn(next.declarations, by) ? next.declarations[by] : undefined;
+  if (after?.uid) {
+    // Unchanged text with the same uid means nothing to store — the state
+    // could still have changed (cheers reset), but storage would not.
+    if (before && before.text === after.text && before.uid === after.uid) return [];
+    return [{ type: 'persist-declaration', uid: after.uid, text: after.text }];
+  }
+  if (!after && before?.uid) return [{ type: 'delete-declaration', uid: before.uid }];
+  return [];
+}
+
+/**
+ * Applies an action, returning the next state plus any effects for the host
+ * to run, or `null` if the action is invalid/a no-op.
+ *
+ * See `reduceState` above for why `action` is a `string` and why member-name
+ * payload fields are rejected rather than coerced.
+ */
+export function reduce(
+  state: PomodoroState | null | undefined,
+  action: string,
+  payload?: PomodoroPayload,
+): PomodoroReduceResult | null {
+  const prev = state || defaultState();
+  const next = reduceState(state, action, payload);
+  if (next === null) return null;
+  return { state: next, effects: declarationEffects(prev, next, action, payload) };
+}
+
+/**
  * Milliseconds until the next event (phase expiry) while running, or `null`
  * if there's nothing to wait for.
  */
@@ -301,9 +372,13 @@ export function timerDelay(state: PomodoroState): number | null {
   return Math.max(0, state.endsAt - Date.now());
 }
 
-/** Called when a phase expires: advances to the next phase, keeps running. */
-export function onTimer(state: PomodoroState): PomodoroState {
-  return advance(state, true);
+/**
+ * Called when a phase expires: advances to the next phase, keeps running.
+ * Phase changes never touch declarations, so the effect list is always empty —
+ * it is returned anyway so both entry points have one shape.
+ */
+export function onTimer(state: PomodoroState): PomodoroReduceResult {
+  return { state: advance(state, true), effects: [] };
 }
 
 // Normalizes declarations loaded from storage into a safe shape. Handles

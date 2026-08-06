@@ -140,11 +140,39 @@ wire, every field is treated as untrusted and validated at the point of use —
 | Export | Signature | Meaning |
 | --- | --- | --- |
 | `defaultState()` | `() => PomodoroState` | A fresh, stopped 25/5-minute state with no declarations or participants. |
-| `reduce` | `(state, action, payload?) => PomodoroState \| null` | Applies one action. `null` means "ignore" (invalid or a no-op). |
+| `reduce` | `(state, action, payload?) => { state, effects } \| null` | Applies one action. `null` means "ignore" (invalid or a no-op). |
 | `timerDelay` | `(state) => number \| null` | Milliseconds until the current phase ends, or `null` if not running. |
-| `onTimer` | `(state) => PomodoroState` | Called once `timerDelay` elapses: advances the phase and keeps running. |
+| `onTimer` | `(state) => { state, effects }` | Called once `timerDelay` elapses: advances the phase and keeps running. Effects are always empty — phases never touch declarations. |
 | `restore` | `(raw: unknown) => PomodoroState \| null` | Normalizes state loaded from storage. `null` only for non-object input; otherwise always stopped, with caps applied. |
 | `persistState` | `(state) => PomodoroState` | Strips `participants` before writing to storage (it's session-only). |
+
+### Effects
+
+Declarations are the one thing here that outlives a session: a member's
+one-liner is meant to come back when they rejoin, so it belongs in your
+storage keyed by member and space. Which member changed, and to what, is
+something only the transition knows — so `reduce` says it and you perform the
+write.
+
+| Effect | When |
+| --- | --- |
+| `{ type: 'persist-declaration', uid, text }` | A signed-in member declared, or changed their text. |
+| `{ type: 'delete-declaration', uid }` | A signed-in member cleared their declaration. |
+
+```ts
+const result = reduce(state, 'declare', { by: name, uid, text });
+if (result) {
+  state = result.state;
+  for (const effect of result.effects) {
+    if (effect.type === 'persist-declaration') db.upsert(spaceId, effect.uid, effect.text);
+    else db.delete(spaceId, effect.uid);
+  }
+}
+```
+
+**Guests produce no effects.** A guest has no account to key storage by, so
+their declaration lives in state and nowhere else — by design. Cheering never
+produces one either: cheers are not stored.
 
 ### Types
 

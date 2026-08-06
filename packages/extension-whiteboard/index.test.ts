@@ -27,8 +27,23 @@ const NOW = 1_700_000_000_000;
 // Accepts any URL starting with this prefix — used by most tests, which
 // don't care about the URL-ownership check itself.
 const ownPrefix = 'https://storage.example.com/';
-const allowOwn = createWhiteboardState({ isOwnImageUrl: (url) => url.startsWith(ownPrefix) });
-const rejectAll = createWhiteboardState({ isOwnImageUrl: () => false });
+const allowOwnApi = createWhiteboardState({ isOwnImageUrl: (url) => url.startsWith(ownPrefix) });
+const rejectAllApi = createWhiteboardState({ isOwnImageUrl: () => false });
+
+// `reduce`/`onTimer` return `{ state, effects }`. The assertions below are
+// about the state transition, so they go through these unwrapping shims; the
+// effects themselves are asserted directly in the "Effects" section at the
+// bottom of this file, using `allowOwnApi` unwrapped.
+function unwrapped(api: ReturnType<typeof createWhiteboardState>) {
+  return {
+    ...api,
+    reduce: (state: any, action: string, payload?: any) =>
+      api.reduce(state, action, payload)?.state ?? null,
+    onTimer: (state: WhiteboardState) => api.onTimer(state)?.state ?? null,
+  };
+}
+const allowOwn = unwrapped(allowOwnApi);
+const rejectAll = unwrapped(rejectAllApi);
 
 function stroke(id: string, overrides: Partial<WhiteboardStroke> = {}): unknown {
   return {
@@ -748,4 +763,109 @@ test('shape byte cap counts UTF-8 bytes, including multi-byte and lone surrogate
   for (const s of ['', 'abc', 'あいうえお', '\u{1F3A8}', '\uD800', 'a\uD800b', '中'.repeat(50)]) {
     assert.equal(enc.encode(s).length, Buffer.byteLength(s, 'utf8'));
   }
+});
+
+// ── Effects ────────────────────────────────────────────────────────────────
+//
+// A finished relay game is the only thing worth keeping past the session, so
+// it is the only source of effects. Free-draw edits change state and nothing
+// else.
+
+/** Runs a 2-player relay to completion, collecting every effect on the way. */
+function playRelayToAlbum() {
+  const api = allowOwnApi;
+  const effects: unknown[] = [];
+  let state = defaultState();
+  const act = (action: string, payload?: any) => {
+    const r = api.reduce(state, action, payload);
+    if (!r) return;
+    state = r.state;
+    effects.push(...r.effects);
+  };
+
+  act('set-mode', { mode: 'relay' });
+  act('join-game', { by: 'Ada' });
+  act('join-game', { by: 'Bob' });
+  act('start-game', { by: 'Ada' });
+  // 2 players take 3 rounds: prompt -> draw -> guess.
+  act('submit-prompt', { by: 'Ada', text: 'a cat' });
+  act('submit-prompt', { by: 'Bob', text: 'a hat' });
+  act('submit-drawing', { by: 'Ada', imageUrl: `${ownPrefix}a.png` });
+  act('submit-drawing', { by: 'Bob', imageUrl: `${ownPrefix}b.png` });
+  act('submit-guess', { by: 'Ada', text: 'a bat' });
+  act('submit-guess', { by: 'Bob', text: 'a mat' });
+  return { state, effects, api };
+}
+
+test('finishing a relay asks the host to store the album, exactly once', () => {
+  const { state, effects } = playRelayToAlbum();
+  assert.equal(state.game?.phase, 'album', 'the game really finished');
+  assert.equal(effects.length, 1, 'no effect from any earlier submission');
+
+  const effect = effects[0] as any;
+  assert.equal(effect.type, 'persist-relay-history');
+  assert.deepEqual(effect.players, ['Ada', 'Bob']);
+  assert.equal(effect.chains.length, 2);
+  // The chains carry the whole game, which is what makes the album replayable.
+  assert.deepEqual(
+    effect.chains.flat().map((e: any) => e.kind),
+    ['prompt', 'drawing', 'guess', 'prompt', 'drawing', 'guess'],
+  );
+});
+
+test('free-draw edits produce no effects', () => {
+  const r = allowOwnApi.reduce(defaultState(), 'add-stroke', { stroke: stroke('s1') });
+  assert.ok(r);
+  assert.deepEqual(r.effects, []);
+});
+
+test('a rematch produces its own single effect', () => {
+  const { state, api } = playRelayToAlbum();
+  // Back to the lobby: leaving album must not itself look like finishing.
+  const reset = api.reduce(state, 'reset-game', { by: 'Ada' });
+  assert.ok(reset);
+  assert.equal(reset.state.game?.phase, 'lobby');
+  assert.deepEqual(reset.effects, []);
+});
+
+test('a relay that ends on a phase timeout also asks the host to store it', () => {
+  // The last round can expire instead of being submitted, and that path goes
+  // through onTimer rather than reduce — it has to report the album too.
+  const api = allowOwnApi;
+  let state = defaultState();
+  const act = (action: string, payload?: any) => {
+    const r = api.reduce(state, action, payload);
+    if (r) state = r.state;
+  };
+  act('set-mode', { mode: 'relay' });
+  act('join-game', { by: 'Ada' });
+  act('join-game', { by: 'Bob' });
+  act('start-game', { by: 'Ada' });
+  act('submit-prompt', { by: 'Ada', text: 'a cat' });
+  act('submit-prompt', { by: 'Bob', text: 'a hat' });
+  act('submit-drawing', { by: 'Ada', imageUrl: `${ownPrefix}a.png` });
+  act('submit-drawing', { by: 'Bob', imageUrl: `${ownPrefix}b.png` });
+  // Nobody guesses; the phase expires instead.
+  const fired = api.onTimer(state);
+  assert.ok(fired);
+  assert.equal(fired.state.game?.phase, 'album');
+  assert.equal(fired.effects.length, 1);
+  assert.equal((fired.effects[0] as any).type, 'persist-relay-history');
+});
+
+test('a phase timeout that does not finish the game produces no effect', () => {
+  const api = allowOwnApi;
+  let state = defaultState();
+  const act = (action: string, payload?: any) => {
+    const r = api.reduce(state, action, payload);
+    if (r) state = r.state;
+  };
+  act('set-mode', { mode: 'relay' });
+  act('join-game', { by: 'Ada' });
+  act('join-game', { by: 'Bob' });
+  act('start-game', { by: 'Ada' });
+  const fired = api.onTimer(state); // prompt phase expires -> draw
+  assert.ok(fired);
+  assert.notEqual(fired.state.game?.phase, 'album');
+  assert.deepEqual(fired.effects, []);
 });

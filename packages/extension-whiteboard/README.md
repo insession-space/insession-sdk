@@ -13,9 +13,10 @@ happens when someone never submits.
 
 This package is that state machine, with none of the plumbing:
 
-- **`reduce` is a pure function.** `(state, action, payload) => nextState |
-  null`. No I/O, no timers started inside it — `null` means "ignore this
-  action" (e.g. adding a shape past the cap, or an empty `clear`).
+- **`reduce` is a pure function.** `(state, action, payload) => { state,
+  effects } | null`. No I/O, no timers started inside it — `null` means
+  "ignore this action" (e.g. adding a shape past the cap, or an empty
+  `clear`), and `effects` describe writes for you to perform (see below).
 - **Confirmed strokes/shapes only.** In-progress drawing (live cursor
   preview) is out of scope on purpose — that belongs on a lower-latency,
   unvalidated relay channel you build yourself. This module only cares about
@@ -184,10 +185,34 @@ use — `reduce` never throws on malformed input; it returns `null` instead.
 | --- | --- | --- |
 | `createWhiteboardState` | `(options: { isOwnImageUrl: (url: string) => boolean }) => WhiteboardStateApi` | Builds the API. Throws if `isOwnImageUrl` is missing or not a function. |
 | `defaultState()` | `() => WhiteboardState` | An empty, free-mode board with no relay game. Also available as a top-level export (see above). |
-| `.reduce` | `(state, action, payload?) => WhiteboardState \| null` | Applies one action. `null` means "ignore" (invalid or a no-op). |
+| `.reduce` | `(state, action, payload?) => { state, effects } \| null` | Applies one action. `null` means "ignore" (invalid or a no-op). |
 | `.timerDelay` | `(state) => number \| null` | Milliseconds until the current relay phase expires (plus a grace period), or `null` if no relay game is running. |
-| `.onTimer` | `(state) => WhiteboardState \| null` | Called once `timerDelay` elapses: fills a placeholder for anyone who hasn't submitted, then advances the round. `null` if there's no game. |
+| `.onTimer` | `(state) => { state, effects } \| null` | Called once `timerDelay` elapses: fills a placeholder for anyone who hasn't submitted, then advances the round. `null` if there's no game. |
 | `.restore` | `(raw: unknown) => WhiteboardState \| null` | Normalizes state loaded from storage. `null` only for non-object input; otherwise strokes/shapes are filtered and capped, `mode` is always `'free'`, and `game` is always `null`. |
+
+### Effects
+
+A finished relay game is the one thing here worth keeping past the session:
+the album — who drew what, in which order — is the payoff, and it disappears
+when everyone leaves.
+
+| Effect | When |
+| --- | --- |
+| `{ type: 'persist-relay-history', players, chains }` | The relay reaches its album, from either `reduce` or `onTimer`. |
+
+Fired **exactly once per game**, on the edge into the album. A rematch
+(`reset-game` back to the lobby, then playing again) produces its own single
+effect. Free-draw edits produce none.
+
+```ts
+const result = board.reduce(state, action, payload);
+if (result) {
+  state = result.state;
+  for (const effect of result.effects) {
+    db.insertRelayHistory(spaceId, { finishedAt: Date.now(), ...effect });
+  }
+}
+```
 
 ### Types
 
