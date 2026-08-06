@@ -11,13 +11,14 @@
 | `packages/space` | `@insession/space` | **space の親。** ヘッドレスなスペースを extension の集合として組み立てるエンジン。extension 契約（`defineSpaceExtension`）・集約 registry（`createExtensionRegistry`）・参加者ライフサイクル（members / presence / 参加・離脱。`members/`）・インスタンス（`createSpace`）を持つ。I/O は一切行わず effect 記述子を返すだけで、WS とストレージは利用者が自前で持つ | **なし** |
 | `packages/ws-resilient-transport` | `@insession/ws-resilient-transport` | 本番デプロイの都合に合わせて再接続する WebSocket トランスポート（サービス再起動時の高速再接続 / ジッター付き指数バックオフ / terminal close code） | **なし** |
 | `packages/space-state` | `@insession/space-state` | transport・フレームワーク非依存のスペース状態 store。受信は純粋 reducer、送信は `onSend` に流すだけ、副作用は effect 記述子で返すだけ | **なし** |
-| `packages/space-state-react` | `@insession/space-state-react` | 上を React の `useSyncExternalStore` に繋ぐ薄いラッパー（1関数） | `space-state` / peer に `react` |
 | `packages/extension-pomodoro` | `@insession/extension-pomodoro` | 依存ゼロのポモドーロタイマー状態機械（server-authoritative。`reduce` は純関数、`restore`/`persistState` で永続化境界を扱う） | **なし** |
 | `packages/extension-whiteboard` | `@insession/extension-whiteboard` | 依存ゼロのホワイトボード状態機械（server-authoritative。自由描画の strokes/shapes と「お絵かき伝言ゲーム」relay を同居させた `reduce` は純関数） | **なし** |
 | `packages/extension-watch-party` | `@insession/extension-watch-party` | 依存ゼロの Watch Party（動画/音声の同期再生）状態機械（server-authoritative。`reduce` は `{ state, effects }` を返す純関数で、broadcast/永続化/タイトル解決は effect 記述子としてホストに委ねる） | **なし** |
 | `packages/extension-chat` | `@insession/extension-chat` | 依存ゼロのチャット状態機械（server-authoritative。メッセージの正規化・スタンプ検証・返信・リアクション・ピン留め。`reduce` は `{ state, effects }` を返す純関数で、永続化/broadcast/bot 通知は effect 記述子としてホストに委ねる） | **なし** |
 
-**依存の向きは `space-state-react` → `space-state` の一方向だけ。** `space` / `ws-resilient-transport` と `extension-pomodoro` / `extension-whiteboard` / `extension-watch-party` / `extension-chat` は完全に独立していて、他のパッケージと繋がっていない（transport と状態管理を分けているのが設計の要点なので、ここに依存を足さない）。
+**パッケージ間の依存は1本も無い。** 7つはすべて互いに独立している（transport と状態管理を分けているのが設計の要点なので、ここに依存を足さない）。
+
+**⚠ React バインディングを別パッケージに戻さないこと。** かつて `@insession/space-state-react` が居たが、本体が `useSyncExternalStore(store.subscribe, store.getState)` の1行しかなく、**自前の変更が入った版が一度も無いまま** `workspace:*` 依存で `space-state` の採番に引きずられ続けていたので廃止した（#42。npm 上は deprecated）。`space-state` の `getState` / `subscribe` が `useSyncExternalStore` の契約をそのまま満たしているので、消費者が自分のコードに1行書けば足りる — これは下記「単体で install されないものはパッケージにしない」の実例そのもの。React 向けの繋ぎ方は `packages/space-state/README.md` の「Binding it to React」と docs の `/examples/react-binding/` が持つ。
 
 **⚠ `space` が状態機械パッケージに依存しないのは意図的。** 親パッケージが特定の実装を import すると「どの状態機械を使うか」を契約側が決めてしまう。`space` は既存4つが**既に満たしている形**（`defaultState` / `reduce` / `timerDelay` / `onTimer` / `restore` / `persistState`）を型として言語化しただけなので、消費側が `defineSpaceExtension({ name, server: <既存パッケージの API> })` と書けば構造的に嵌る。逆向き（状態機械側が `space` を import する）も同じ理由で足さないこと — 依存ゼロが売りのパッケージにランタイム依存が1つ増える。
 
@@ -129,7 +130,7 @@ npm はアカウントの 2FA か bypass 2FA 付きトークンを要求する�
 | 入れる | 入れない |
 | --- | --- |
 | 汎用のランタイム（`ws-resilient-transport`。InSession 固有の情報を1つも含まない） | **plugin**（`plugin-pomodoro` 等）。UI・i18n キー・プロダクト判断を抱えるので `insession-app` 側に置く |
-| 依存ゼロの状態機械（`space-state`）とその薄いバインディング（`space-state-react`） | **UI を持つもの全般**。`@insession/design-system` への依存をこのリポジトリに持ち込まない |
+| 依存ゼロの状態機械（`space-state`） | **UI を持つもの全般**。`@insession/design-system` への依存をこのリポジトリに持ち込まない。**フレームワーク固有の薄いバインディングも同じ**（React 用の1行フックを別パッケージで配っていたが #42 で廃止した） |
 | **ただし plugin の server 面**（UI・i18n・design-system への依存を持たず、外部 import がゼロの純粋な状態機械）は入れてよい（`extension-pomodoro` / `extension-whiteboard`） | plugin の **client 面**（UI コンポーネント。`pomodoro-kit` 等） |
 
 **「`@insession/*` スコープだから」という理由だけでここへ移さないこと。** スコープは「OSS 候補である」という表明でしかなく、置き場所の判断とは別。plugin をここへ入れると次の3つが同時に起きる:

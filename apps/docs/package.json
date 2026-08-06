@@ -29,7 +29,6 @@
     "@insession/extension-watch-party": "workspace:*",
     "@insession/extension-whiteboard": "workspace:*",
     "@insession/space-state": "workspace:*",
-    "@insession/space-state-react": "workspace:*",
     "astro": "^5.14.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

@@ -1,0 +1,54 @@
+---
+title: 'React バインディング'
+description: 'SpaceStore を useSyncExternalStore で React に繋ぐ実動作デモ。1行のフックが実際に bail out する様子をレンダリング回数で確認できます。'
+---
+
+import ReactBindingDemo from '../../../../components/examples/ReactBindingDemo.tsx';
+
+React 用にインストールするパッケージはありません。`SpaceStore` は `useSyncExternalStore` の
+契約をそのまま満たしているので、繋ぎ込みは**自分のコードベースに置く1行**で全部です。その1行を
+見せても「本当にこれだけ？」以上のことは分からないので、代わりに**レンダリング回数**を出します。
+同じ人に対して `typing` を2回押してみてください。2回目は再レンダリングされません — store が
+同一の state 参照を返し、`useSyncExternalStore` が bail out するからです。
+
+<ReactBindingDemo client:only="react" />
+
+## 試してみること
+
+- **chat** を何回か押す。メッセージのたびに新しい state になるので、`<ChatPanel />` は毎回
+  再レンダリングされ、回数が received と一緒に増えていきます。
+- **typing (same person)** を連打する。最初の1回だけ再レンダリングされ（`typingUsers` に名前が
+  加わるため）、それ以降は `messages received` だけが増えて回数は動きません。この差がこのページの
+  すべてです。
+- `typing` を何回か押したあとで **chat** を押す。入力中表示が消えてパネルが再レンダリングされます
+  — 本当に変わったときはちゃんと通ります。
+
+## 裏で動いているコード
+
+```tsx
+import { createSpaceStore, type SpaceState, type SpaceStore } from '@insession/space-state';
+import { useSyncExternalStore } from 'react';
+
+// 繋ぎ込みはこれで全部。他のフックと同じ場所に置いてください。
+function useSpaceState(store: SpaceStore): SpaceState {
+  return useSyncExternalStore(store.subscribe, store.getState);
+}
+
+const store = createSpaceStore({ selfName: 'you', t: (k) => k, getPresence: () => 'active' });
+
+function ChatPanel() {
+  const state = useSpaceState(store);
+  return <ul>{state.chatLines.map((line) => <li key={line.id}>{line.text}</li>)}</ul>;
+}
+```
+
+統合はこれで全部です。bail out の挙動はこのフックで実装されているわけではありません — store が
+`useSyncExternalStore` の契約（何も変わっていなければ `getState()` は同一参照を返す）を守って
+いることから来るものです。
+
+`getServerSnapshot` を渡していないのは、store の state がブラウザの生きた接続を前提にしていて、
+サーバー側で描くべきものが無いからです。サーバーレンダリングする場合は、自分の初期状態を
+第3引数に渡してください。
+
+`getState` / `subscribe` を含む store の全体像は
+[`space-state` のリファレンス](/ja/packages/space-state/)を参照してください。

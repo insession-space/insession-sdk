@@ -57,22 +57,6 @@ hero:
   </div>
 
   <div class="pkg-card">
-    <h3>@insession/space-state-react</h3>
-    <p>
-      <code>space-state</code> の React バインディング。<code>useSyncExternalStore</code> を包む
-      フック1つ・約10行で、ロジックは一切持たない。
-    </p>
-    <div class="pkg-tags">
-      <span class="pkg-tag">フック1つ</span>
-      <span class="pkg-tag">react は peer</span>
-    </div>
-    <div class="pkg-links">
-      <a href="/ja/packages/space-state-react/">ドキュメント</a>
-      <a href="https://www.npmjs.com/package/@insession/space-state-react">npm</a>
-    </div>
-  </div>
-
-  <div class="pkg-card">
     <h3>@insession/extension-pomodoro</h3>
     <p>
       サーバーを正とするポモドーロタイマーの状態機械。start / pause / skip / configure と宣言・声援を
@@ -91,9 +75,11 @@ hero:
 </div>
 
 <p class="dep-note">
-  4つの間にある依存は <code>space-state-react</code> → <code>space-state</code> の1本だけ。
-  <code>ws-resilient-transport</code> と <code>extension-pomodoro</code> は独立しています —
-  バイトを運ぶことと状態を持つことを意図的に切り離してあるので、どちらか一方だけを採用できます。
+  パッケージ間の依存は1本もありません。<code>space-state</code> /
+  <code>ws-resilient-transport</code> / <code>extension-pomodoro</code> はそれぞれ独立しています —
+  バイトを運ぶことと状態を持つことを意図的に切り離してあるので、どれか1つだけを採用できます。
+  React で使う場合も、入れるバインディングのパッケージはありません。
+  <a href="/ja/examples/react-binding/">自分で書く1行</a>がフックの全部です。
 </p>
 
 ## なぜこれを使うのか

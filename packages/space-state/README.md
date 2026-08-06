@@ -29,8 +29,8 @@ npm install @insession/space-state
 ```
 
 Published as a built ESM package (`dist/index.js` + `dist/index.d.ts`), no
-runtime dependencies. To bind it to React, add
-[`@insession/space-state-react`](https://www.npmjs.com/package/@insession/space-state-react).
+runtime dependencies. There is nothing else to install — see
+[Binding it to React](#binding-it-to-react) if that is your UI layer.
 
 ## Usage
 
@@ -66,6 +66,28 @@ store.chat.react(messageId, '🎉');
 store.presence.change('away');
 store.settings.update({ theme: 'dark' });
 ```
+
+### Binding it to React
+
+`getState` / `subscribe` are shaped for `useSyncExternalStore`, so there is no
+React package to install — the binding is one line you keep with your own hooks:
+
+```tsx
+import type { SpaceState, SpaceStore } from '@insession/space-state';
+import { useSyncExternalStore } from 'react';
+
+export function useSpaceState(store: SpaceStore): SpaceState {
+  return useSyncExternalStore(store.subscribe, store.getState);
+}
+```
+
+Re-rendering already behaves: `getState()` returns the same reference while
+nothing has changed, so React bails out on messages that do not alter state
+(a repeated `typing` from the same person, for instance).
+
+Pass a third argument if you server-render. This package deliberately ships no
+default for it — the store's state presupposes a live connection, so what a
+server should show instead is your product's decision, not ours.
 
 ### Testing without a server
 

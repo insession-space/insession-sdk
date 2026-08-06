@@ -35,8 +35,8 @@ npm install @insession/space-state
 ```
 
 ビルド済み ESM パッケージ（`dist/index.js` + `dist/index.d.ts`）として配布され、ランタイム依存は
-ゼロです。React に繋ぐなら
-[`@insession/space-state-react`](https://www.npmjs.com/package/@insession/space-state-react) を足します。
+ゼロです。他に入れるものはありません — UI 層が React なら
+[React に繋ぐ](#react-に繋ぐ)を参照してください。
 
 ## 使い方
 
@@ -72,6 +72,28 @@ store.chat.react(messageId, '🎉');
 store.presence.change('away');
 store.settings.update({ theme: 'dark' });
 ```
+
+### React に繋ぐ
+
+`getState` / `subscribe` は `useSyncExternalStore` の形に合わせてあるので、React 用に入れる
+パッケージはありません。繋ぎ込みは自分のフック群と一緒に置く1行で全部です。
+
+```tsx
+import type { SpaceState, SpaceStore } from '@insession/space-state';
+import { useSyncExternalStore } from 'react';
+
+export function useSpaceState(store: SpaceStore): SpaceState {
+  return useSyncExternalStore(store.subscribe, store.getState);
+}
+```
+
+再レンダリングの挙動は既に正しくなっています。何も変わっていなければ `getState()` は同一参照を
+返すので、state を変えないメッセージ（同じ人からの連続した `typing` など）では React が
+bail out します。
+
+サーバーレンダリングするなら第3引数を渡してください。このパッケージが既定値を出荷しないのは
+意図的で、store の state は生きた接続を前提にしているため、代わりにサーバーが何を出すべきかは
+このパッケージではなくプロダクト側の判断だからです。
 
 ### サーバーなしでテストする
 
