@@ -1,5 +1,13 @@
 # @insession/docs
 
+## 0.0.6
+
+### Patch Changes
+
+- Updated dependencies [2d9ef3f]
+  - @insession/extension-pomodoro@0.3.0
+  - @insession/extension-whiteboard@0.3.0
+
 ## 0.0.5
 
 ### Patch Changes

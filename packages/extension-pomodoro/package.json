@@ -1,6 +1,6 @@
 {
   "name": "@insession/extension-pomodoro",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "A dependency-free, framework-agnostic Pomodoro timer state machine. The server holds the authoritative state; reduce() is a pure function.",
   "//": "このパッケージは insession-app の plugin-pomodoro の server 面(純粋関数のみ)を切り出したもので、UI・i18n・design-system への依存を持たないため SDK に置ける。UI 側(pomodoro-kit)と plugin 本体は insession-app に残る。",
   "//exports": "ESM に加えて CJS も出しているのは、消費者である insession-app のサーバーがビルドせず .ts を直接実行しており require() で読むため。ESM only にすると require が壊れる。",
