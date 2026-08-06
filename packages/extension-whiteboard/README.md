@@ -199,8 +199,23 @@ when everyone leaves.
 | Effect | When |
 | --- | --- |
 | `{ type: 'persist-relay-history', players, chains }` | The relay reaches its album, from either `reduce` or `onTimer`. |
+| `{ type: 'relay', payload }` | A live drawing frame (`relay` action). **Nothing changed** — forward it to everyone but the sender and store nothing. |
 
-Fired **exactly once per game**, on the edge into the album. A rematch
+`relay` is the one action that returns `{ effects }` with **no state**. A live
+preview streams a frame per pointer move: worth forwarding to whoever is
+watching, worth nothing a second later. Going through the normal path would
+persist the board, broadcast it, and re-arm the relay phase timer on every
+frame — the last of which would keep a countdown that is supposed to run out
+from ever running out.
+
+Its `payload` is **opaque on purpose**. What a frame contains — a partial
+stroke, a whole board at reduced fidelity, a cursor position — is a contract
+between your drawing client and your renderer, and it changes whenever that UI
+grows a feature. This package passes it through untouched; you decide how it
+goes on the wire. What it *does* decide is that the whiteboard accepts relay at
+all.
+
+`persist-relay-history` is fired **exactly once per game**, on the edge into the album. A rematch
 (`reset-game` back to the lobby, then playing again) produces its own single
 effect. Free-draw edits produce none.
 
