@@ -1,8 +1,8 @@
-# @insession/plugin-pomodoro-state
+# @insession/extension-pomodoro
 
 A **dependency-free, server-authoritative Pomodoro timer state machine.**
 
-Shared Pomodoro timers ("the whole room is on the same clock") are easy to get
+Shared Pomodoro timers ("the whole space is on the same clock") are easy to get
 subtly wrong: whoever owns the countdown has to agree with everyone else on
 when a phase ends, survive a server restart without a fake countdown resuming
 from garbage, and let people declare "what I'm doing this session" and cheer
@@ -32,12 +32,38 @@ This package is that state machine, with none of the plumbing:
 ## Install
 
 ```sh
-npm install @insession/plugin-pomodoro-state
+npm install @insession/extension-pomodoro
 ```
 
 Published as a built package with both ESM (`dist/index.js`) and CommonJS
 (`dist/index.cjs`) entry points plus `dist/index.d.ts` types, no runtime
 dependencies.
+
+> Renamed from `@insession/plugin-pomodoro-state` at 0.2.0. The old name is
+> deprecated on npm; the API is unchanged apart from the addition of
+> `pomodoroExtension` below.
+
+## Drop it into a space
+
+If you are assembling a space with
+[`@insession/space`](https://www.npmjs.com/package/@insession/space), the whole
+integration is one line — the extension carries its own name, reducer, timers
+and persistence rules:
+
+```ts
+import { createSpace } from '@insession/space';
+import { pomodoroExtension } from '@insession/extension-pomodoro';
+
+const space = createSpace({ extensions: [pomodoroExtension()] });
+
+space.dispatch('pomodoro', 'start'); // -> [broadcast, schedule-timer]
+```
+
+Pass `{ name }` to occupy a different key, e.g. to run two independent timers.
+
+Nothing is imported from `@insession/space` to build that object: it satisfies
+that package's `SpaceExtension` structurally, so this package keeps its zero
+dependencies and everything below still works without it.
 
 ## Usage
 
@@ -50,9 +76,9 @@ import {
   restore,
   timerDelay,
   type PomodoroState,
-} from '@insession/plugin-pomodoro-state';
+} from '@insession/extension-pomodoro';
 
-// Somewhere you keep one PomodoroState per room, e.g. a Map<roomId, PomodoroState>.
+// Somewhere you keep one PomodoroState per space, e.g. a Map<spaceId, PomodoroState>.
 let state: PomodoroState = defaultState();
 
 // A client action arrives over your transport (WebSocket, etc). `by` identifies
@@ -61,7 +87,7 @@ function onClientAction(action: string, payload: unknown) {
   const next = reduce(state, action, payload as Record<string, unknown>);
   if (!next) return; // invalid or a no-op — nothing changed, nothing to broadcast
   state = next;
-  broadcastToRoom({ type: 'plugin-pomodoro-state', state });
+  broadcastToSpace({ type: 'extension-pomodoro', state });
   schedulePhaseTimer();
 }
 
@@ -73,12 +99,12 @@ function schedulePhaseTimer() {
   if (delay === null) return; // not running — nothing to schedule
   phaseTimer = setTimeout(() => {
     state = onTimer(state);
-    broadcastToRoom({ type: 'plugin-pomodoro-state', state });
+    broadcastToSpace({ type: 'extension-pomodoro', state });
     schedulePhaseTimer();
   }, delay);
 }
 
-// Load from storage on room startup / first join.
+// Load from storage on space startup / first join.
 function loadFromDb(raw: unknown) {
   state = restore(raw) ?? defaultState();
 }

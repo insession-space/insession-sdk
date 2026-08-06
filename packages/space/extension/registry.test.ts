@@ -12,9 +12,9 @@ import {
 // exist in this repo, so the contract is exercised against real signatures
 // rather than an idealized one:
 //
-//   `counter` -> `plugin-pomodoro-state`: returns a bare state, has timers,
+//   `counter` -> `extension-pomodoro`: returns a bare state, has timers,
 //                strips a session-only field in `persistState`.
-//   `board`   -> `chat-state` / `plugin-watch-party-state`: returns
+//   `board`   -> `extension-chat` / `extension-watch-party`: returns
 //                `{ state, effects }`, mixes core message effects with
 //                domain-specific ones, no timers.
 

@@ -2,7 +2,7 @@
 // message normalization, sticker validation, replies, per-message emoji
 // reactions, a typing indicator, and a pinned message.
 //
-// Storage model: unlike `plugin-pomodoro-state`/`plugin-watch-party-state`,
+// Storage model: unlike `extension-pomodoro`/`extension-watch-party`,
 // almost nothing here lives in memory. The message log itself is owned by the
 // host's database — this package never holds a transcript. The only genuine
 // in-memory state is `pinnedMessage`, the one message a room has singled out.
@@ -10,7 +10,7 @@
 // message, what gets normalized away, what goes on the wire, and which side
 // effects the host must perform.
 //
-// Like `plugin-watch-party-state`, `reduce` returns `{ state, effects }` — a
+// Like `extension-watch-party`, `reduce` returns `{ state, effects }` — a
 // list of effect descriptors the host interprets and executes (write to its
 // DB, broadcast over its transport, hand the text to a bot) — rather than
 // taking callbacks. This mirrors the convention `@insession/space-state`'s
@@ -20,7 +20,7 @@
 // ## Two-step actions
 //
 // Three flows need a value only the host's storage can produce, so they are
-// split across two `reduce` calls, exactly like `plugin-watch-party-state`'s
+// split across two `reduce` calls, exactly like `extension-watch-party`'s
 // `resolve-metadata` round trip:
 //
 // | first action     | effect the host runs                  | feed the result back as |
@@ -123,8 +123,8 @@ export type ChatAction =
  * `avatar` and `stickerAllowed`. The host is expected to fill these in from
  * the authenticated connection (and from its own storage, for
  * `stickerAllowed`) *before* calling `reduce`, never to pass them through
- * from the client — the same expectation `plugin-pomodoro-state` has for its
- * `by`/`uid` and `plugin-watch-party-state` has for its settings fields.
+ * from the client — the same expectation `extension-pomodoro` has for its
+ * `by`/`uid` and `extension-watch-party` has for its settings fields.
  */
 export interface ChatPayload {
   /** `chat`: the message body. Ignored for stickers. */
@@ -138,9 +138,9 @@ export interface ChatPayload {
    *
    * Deciding which image URLs may enter a shared room is a genuine trust
    * boundary, and in every real host it needs I/O (a storage-ownership check,
-   * a lookup of admin-managed sticker sets, a per-room allowlist). That can't
+   * a lookup of admin-managed sticker sets, a per-space allowlist). That can't
    * be a synchronous injected predicate the way
-   * `plugin-whiteboard-state`'s `isOwnImageUrl` is, and making it async would
+   * `extension-whiteboard`'s `isOwnImageUrl` is, and making it async would
    * force `reduce` to be async too. So the host resolves it first and folds
    * the answer in here.
    *
@@ -289,7 +289,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-/** A fresh, empty room: nothing pinned. */
+/** A fresh, empty space: nothing pinned. */
 export function defaultState(): ChatState {
   return { pinnedMessage: null };
 }
@@ -343,7 +343,7 @@ export interface CreateChatStateOptions {
    * Source of the timestamp stamped on each message. Defaults to `Date.now`.
    *
    * Injected only so tests can pin it — it is *not* a trust boundary the way
-   * `plugin-whiteboard-state`'s `isOwnImageUrl` is. Note that the timestamp
+   * `extension-whiteboard`'s `isOwnImageUrl` is. Note that the timestamp
    * is taken when the message is accepted, not after the host's insert
    * returns, so it reflects when the room received the message rather than
    * how long storage took.
@@ -588,4 +588,28 @@ export function createChatState(options: CreateChatStateOptions = {}): ChatState
   }
 
   return { defaultState, reduce, restore };
+}
+
+// ── As a space extension ───────────────────────────────────────────────────
+
+/** Options for `chatExtension`. Everything `createChatState` takes, plus a name. */
+export interface ChatExtensionOptions extends CreateChatStateOptions {
+  /**
+   * The key this extension occupies in space state, and the identifier its
+   * updates are broadcast under. Defaults to `'chat'`.
+   */
+  name?: string;
+}
+
+/**
+ * This module packaged as a space extension, ready to hand to
+ * `createSpace({ extensions: [...] })` from `@insession/space`.
+ *
+ * Nothing is imported to build it: the returned object satisfies that
+ * package's `SpaceExtension` *structurally*, so this package keeps its zero
+ * dependencies and stays perfectly usable without `@insession/space` at all.
+ */
+export function chatExtension(options: ChatExtensionOptions = {}) {
+  const { name = 'chat', ...rest } = options;
+  return { name, server: createChatState(rest) };
 }

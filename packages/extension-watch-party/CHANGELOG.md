@@ -1,4 +1,6 @@
-# @insession/plugin-watch-party-state
+# @insession/extension-watch-party
+
+> Renamed from `@insession/plugin-watch-party-state` at 0.4.0. Entries below 0.4.0 were published under the old name.
 
 ## 0.3.0
 

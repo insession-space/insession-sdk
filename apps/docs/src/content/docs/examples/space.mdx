@@ -28,14 +28,14 @@ handed to `createSpaceStore`. The core never learns the plugin's name, its
 wording, or its sound; it just calls `onAppState` and passes along whatever
 comes back.
 
-**Chat is core, not a plugin.** `@insession/chat-state` runs on the server and
+**Chat is core, not a plugin.** `@insession/extension-chat` runs on the server and
 its `broadcast` / `send-to-sender` messages land directly on the receive cases
 `@insession/space-state` already has. Press **send text** and watch the trace:
 the sender is excluded from the broadcast and gets a `chat-ack` instead, which
 carries the id their optimistic local line was missing. Two packages, written
 separately, meeting exactly at `clientMsgId`.
 
-**The player sits outside the core.** `@insession/plugin-watch-party-state`
+**The player sits outside the core.** `@insession/extension-watch-party`
 broadcasts `play`, `seek` and `queue-update` — and `space-state` has no case for
 any of them, on purpose. The player is a separate channel of the room, so the
 page projects those messages into its own view, exactly as a real player

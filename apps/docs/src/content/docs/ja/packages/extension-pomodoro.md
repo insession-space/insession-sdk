@@ -1,10 +1,10 @@
 ---
-title: '@insession/plugin-pomodoro-state'
+title: '@insession/extension-pomodoro'
 description: 依存ゼロの、サーバーを正とするポモドーロタイマー状態機械。
 ---
 
 :::note[英語版が正です]
-このページは [英語版](/packages/plugin-pomodoro-state/) を訳したものです。英語版は npm に配布される
+このページは [英語版](/packages/extension-pomodoro/) を訳したものです。英語版は npm に配布される
 `README.md` から自動生成されており、内容が食い違う場合は**英語版が正**です。
 :::
 
@@ -34,11 +34,36 @@ description: 依存ゼロの、サーバーを正とするポモドーロタイ�
 ## インストール
 
 ```sh
-npm install @insession/plugin-pomodoro-state
+npm install @insession/extension-pomodoro
 ```
 
 ESM（`dist/index.js`）と CommonJS（`dist/index.cjs`）の両方のエントリポイントに `dist/index.d.ts` の型を
 添えたビルド済みパッケージとして配布され、ランタイム依存はありません。
+
+:::note[0.2.0 で改名しました]
+`@insession/plugin-pomodoro-state` から改名しました。旧名は npm 上で deprecated です。
+API は下記の `pomodoroExtension` が増えた以外に変更はありません。
+:::
+
+## スペースに載せる
+
+[`@insession/space`](/ja/packages/space/) でスペースを組み立てているなら、組み込みは1行です。
+extension が自分の名前・reducer・タイマー・永続化の規則をまとめて持っています。
+
+```ts
+import { createSpace } from '@insession/space';
+import { pomodoroExtension } from '@insession/extension-pomodoro';
+
+const space = createSpace({ extensions: [pomodoroExtension()] });
+
+space.dispatch('pomodoro', 'start'); // -> [broadcast, schedule-timer]
+```
+
+`{ name }` を渡せば別のキーを占有できます（独立したタイマーを2つ動かす、など）。
+
+このオブジェクトを作るのに `@insession/space` から何も import していません。あちらの
+`SpaceExtension` を**構造的に**満たしているだけなので、このパッケージは依存ゼロのままで、
+以下の使い方も `@insession/space` 無しでそのまま通用します。
 
 ## 使い方
 
@@ -51,7 +76,7 @@ import {
   restore,
   timerDelay,
   type PomodoroState,
-} from '@insession/plugin-pomodoro-state';
+} from '@insession/extension-pomodoro';
 
 // ルームごとに PomodoroState を1つ持つ場所。例えば Map<roomId, PomodoroState>。
 let state: PomodoroState = defaultState();
@@ -62,7 +87,7 @@ function onClientAction(action: string, payload: unknown) {
   const next = reduce(state, action, payload as Record<string, unknown>);
   if (!next) return; // 無効、または no-op — 何も変わっていないので配信するものも無い
   state = next;
-  broadcastToRoom({ type: 'plugin-pomodoro-state', state });
+  broadcastToRoom({ type: 'extension-pomodoro', state });
   schedulePhaseTimer();
 }
 
@@ -74,7 +99,7 @@ function schedulePhaseTimer() {
   if (delay === null) return; // 動作中でない — 張るものは無い
   phaseTimer = setTimeout(() => {
     state = onTimer(state);
-    broadcastToRoom({ type: 'plugin-pomodoro-state', state });
+    broadcastToRoom({ type: 'extension-pomodoro', state });
     schedulePhaseTimer();
   }, delay);
 }

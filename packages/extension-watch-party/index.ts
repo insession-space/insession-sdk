@@ -9,7 +9,7 @@
 // `request-sync` for a client that needs to catch up, e.g. after returning
 // from a backgrounded tab).
 //
-// Unlike `plugin-whiteboard-state`/`plugin-pomodoro-state`, this module
+// Unlike `extension-whiteboard`/`extension-pomodoro`, this module
 // genuinely has side effects worth doing (broadcast a message, persist
 // playback position, ask the host to resolve a title). Rather than take
 // callbacks, `reduce` returns `{ state, effects }` — a list of effect
@@ -107,7 +107,7 @@ export type WatchPartyAction =
  * `maxDurationSec`) are host-trusted *settings* rather than wire data
  * proper — the host is expected to read them from its own space settings and
  * fold them into the payload before calling `reduce`, the same way
- * `plugin-pomodoro-state`'s payload expects the host to inject `by`/`uid`
+ * `extension-pomodoro`'s payload expects the host to inject `by`/`uid`
  * from the authenticated sender rather than trusting the wire for those.
  */
 export interface WatchPartyPayload {
@@ -325,7 +325,7 @@ export function defaultState(): WatchPartyState {
 // Strips fields the client has no business seeing before an item is
 // broadcast (`addedByUid`/`addSeq` on queue items). This is done here, at
 // the point a `broadcast` effect is constructed, rather than left to the
-// host — the same way `plugin-whiteboard-state` fully sanitizes a shape
+// host — the same way `extension-whiteboard` fully sanitizes a shape
 // before handing it back, so a host can't forget the step. See point (e) in
 // the module's design notes. Effects other than `broadcast` (e.g.
 // `persist-playback`) are for the host's own storage, which is free to keep
@@ -578,7 +578,7 @@ export interface WatchPartyStateApi {
    * Normalizes state loaded from storage into a safe shape. `null` only for
    * non-object input. Playback always comes back stopped (`isPlaying:
    * false`) rather than resuming a countdown against a clock that's no
-   * longer valid after a restart — same reasoning `plugin-pomodoro-state`
+   * longer valid after a restart — same reasoning `extension-pomodoro`
    * uses for its own restored `running`/`endsAt`.
    */
   restore: (raw: unknown) => WatchPartyState | null;
@@ -590,7 +590,7 @@ export interface WatchPartyStateApi {
  * just means shuffle is inert (always FIFO), and omitting `autoAdvanceBy`
  * falls back to `'queue'`.
  *
- * Unlike `plugin-whiteboard-state`'s `createWhiteboardState`, this factory
+ * Unlike `extension-whiteboard`'s `createWhiteboardState`, this factory
  * has no *required* option. Whiteboard's `isOwnImageUrl` guards a genuine
  * trust boundary (which external URLs may enter shared state) that this
  * package cannot safely default. This package's `mediaUrl`/`thumbnail`
@@ -1101,7 +1101,7 @@ export function createWatchParty(options: CreateWatchPartyOptions = {}): WatchPa
       mediaUrl: typeof r.mediaUrl === 'string' ? r.mediaUrl : null,
       thumbnail: typeof r.thumbnail === 'string' ? r.thumbnail : null,
       // Playback always comes back stopped — see `WatchPartyStateApi.restore`'s
-      // doc comment for why (same reasoning as `plugin-pomodoro-state`).
+      // doc comment for why (same reasoning as `extension-pomodoro`).
       isPlaying: false,
       position,
       lastUpdate: Date.now(),
@@ -1168,4 +1168,28 @@ function sanitizeRestoredHistoryItem(raw: unknown, index: number): WatchPartyHis
     byUid: normName(r.byUid),
     ts: Number.isFinite(ts) && ts > 0 ? ts : Date.now(),
   };
+}
+
+// ── As a space extension ───────────────────────────────────────────────────
+
+/** Options for `watchPartyExtension`. Everything `createWatchParty` takes, plus a name. */
+export interface WatchPartyExtensionOptions extends CreateWatchPartyOptions {
+  /**
+   * The key this extension occupies in space state, and the identifier its
+   * updates are broadcast under. Defaults to `'watch-party'`.
+   */
+  name?: string;
+}
+
+/**
+ * This module packaged as a space extension, ready to hand to
+ * `createSpace({ extensions: [...] })` from `@insession/space`.
+ *
+ * Nothing is imported to build it: the returned object satisfies that
+ * package's `SpaceExtension` *structurally*, so this package keeps its zero
+ * dependencies and stays perfectly usable without `@insession/space` at all.
+ */
+export function watchPartyExtension(options: WatchPartyExtensionOptions = {}) {
+  const { name = 'watch-party', ...rest } = options;
+  return { name, server: createWatchParty(rest) };
 }

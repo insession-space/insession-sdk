@@ -11,9 +11,9 @@ app. They are independent enough that you can adopt one and ignore the rest.
 | [`@insession/ws-resilient-transport`](/packages/ws-resilient-transport/) | Keeps a WebSocket connected across deploys: fast reconnect on service restart, jittered backoff otherwise, terminal close codes that stop retrying. | none |
 | [`@insession/space-state`](/packages/space-state/) | Holds the state of a shared room — members, chat, presence, typing, plugins — as a pure reducer over inbound messages. | none |
 | [`@insession/space-state-react`](/packages/space-state-react/) | Binds the store to React via `useSyncExternalStore`. One hook. | `@insession/space-state` (+ `react` as a peer) |
-| [`@insession/plugin-pomodoro-state`](/packages/plugin-pomodoro-state/) | A server-authoritative Pomodoro timer state machine: pure `reduce`, plus `restore`/`persistState` for the storage boundary. | none |
-| [`@insession/plugin-whiteboard-state`](/packages/plugin-whiteboard-state/) | A server-authoritative Whiteboard state machine: shared free-draw strokes/shapes plus an optional "drawing telephone" relay game. | none |
-| [`@insession/plugin-watch-party-state`](/packages/plugin-watch-party-state/) | A server-authoritative Watch Party state machine: synchronized video/audio playback with a queue and history. `reduce` returns `{ state, effects }` — no I/O of its own. | none |
+| [`@insession/extension-pomodoro`](/packages/extension-pomodoro/) | A server-authoritative Pomodoro timer state machine: pure `reduce`, plus `restore`/`persistState` for the storage boundary. | none |
+| [`@insession/extension-whiteboard`](/packages/extension-whiteboard/) | A server-authoritative Whiteboard state machine: shared free-draw strokes/shapes plus an optional "drawing telephone" relay game. | none |
+| [`@insession/extension-watch-party`](/packages/extension-watch-party/) | A server-authoritative Watch Party state machine: synchronized video/audio playback with a queue and history. `reduce` returns `{ state, effects }` — no I/O of its own. | none |
 
 ## How they fit together
 
@@ -47,13 +47,13 @@ store stays testable with no server and no browser at all.
 - **Both, in a React app.** Take `ws-resilient-transport`, `space-state`, and
   `space-state-react`.
 - **You need a shared timer people can start, pause and skip together.** Take
-  `plugin-pomodoro-state` alone. It is a state machine only — bring your own transport
+  `extension-pomodoro` alone. It is a state machine only — bring your own transport
   and storage.
 - **You need a shared drawing canvas, optionally with a "drawing telephone"
-  relay game.** Take `plugin-whiteboard-state` alone. Same shape as
-  `plugin-pomodoro-state` — a state machine only.
+  relay game.** Take `extension-whiteboard` alone. Same shape as
+  `extension-pomodoro` — a state machine only.
 - **You need synchronized video/audio playback with a queue.** Take
-  `plugin-watch-party-state` alone. Unlike the other two plugin-state
+  `extension-watch-party` alone. Unlike the other two plugin-state
   packages, it has genuine side effects (broadcast, persist, resolve a
   title) — `reduce` returns them as effect descriptors instead of performing
   them, so it stays a pure function you can test without a transport.

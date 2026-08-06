@@ -74,7 +74,7 @@ hero:
   </div>
 
   <div class="pkg-card">
-    <h3>@insession/plugin-pomodoro-state</h3>
+    <h3>@insession/extension-pomodoro</h3>
     <p>
       A server-authoritative Pomodoro timer state machine: a pure <code>reduce</code> over
       start/pause/skip/configure and declarations/cheers, plus <code>restore</code>/
@@ -85,13 +85,13 @@ hero:
       <span class="pkg-tag">pure reducer</span>
     </div>
     <div class="pkg-links">
-      <a href="/packages/plugin-pomodoro-state/">Docs</a>
-      <a href="https://www.npmjs.com/package/@insession/plugin-pomodoro-state">npm</a>
+      <a href="/packages/extension-pomodoro/">Docs</a>
+      <a href="https://www.npmjs.com/package/@insession/extension-pomodoro">npm</a>
     </div>
   </div>
 
   <div class="pkg-card">
-    <h3>@insession/plugin-whiteboard-state</h3>
+    <h3>@insession/extension-whiteboard</h3>
     <p>
       A server-authoritative Whiteboard state machine: shared free-draw strokes/shapes, plus an
       optional "drawing telephone" relay game with its own phase timing.
@@ -101,13 +101,13 @@ hero:
       <span class="pkg-tag">pure reducer</span>
     </div>
     <div class="pkg-links">
-      <a href="/packages/plugin-whiteboard-state/">Docs</a>
-      <a href="https://www.npmjs.com/package/@insession/plugin-whiteboard-state">npm</a>
+      <a href="/packages/extension-whiteboard/">Docs</a>
+      <a href="https://www.npmjs.com/package/@insession/extension-whiteboard">npm</a>
     </div>
   </div>
 
   <div class="pkg-card">
-    <h3>@insession/plugin-watch-party-state</h3>
+    <h3>@insession/extension-watch-party</h3>
     <p>
       A server-authoritative Watch Party state machine: synchronized video/audio playback with a
       queue and history. <code>reduce</code> returns effect descriptors instead of performing
@@ -118,16 +118,16 @@ hero:
       <span class="pkg-tag">pure reducer</span>
     </div>
     <div class="pkg-links">
-      <a href="/packages/plugin-watch-party-state/">Docs</a>
-      <a href="https://www.npmjs.com/package/@insession/plugin-watch-party-state">npm</a>
+      <a href="/packages/extension-watch-party/">Docs</a>
+      <a href="https://www.npmjs.com/package/@insession/extension-watch-party">npm</a>
     </div>
   </div>
 </div>
 
 <p class="dep-note">
   Only one edge between them: <code>space-state-react</code> → <code>space-state</code>.
-  <code>ws-resilient-transport</code>, <code>plugin-pomodoro-state</code>,
-  <code>plugin-whiteboard-state</code>, and <code>plugin-watch-party-state</code> are independent
+  <code>ws-resilient-transport</code>, <code>extension-pomodoro</code>,
+  <code>extension-whiteboard</code>, and <code>extension-watch-party</code> are independent
   — carrying bytes and holding state are kept apart on purpose, so you can adopt any one alone.
 </p>
 

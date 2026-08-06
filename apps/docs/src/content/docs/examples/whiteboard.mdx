@@ -1,6 +1,6 @@
 ---
 title: 'Whiteboard'
-description: A live demo of @insession/plugin-whiteboard-state — a shared free-draw canvas plus a "drawing telephone" relay game, with every call it made shown next to them.
+description: A live demo of @insession/extension-whiteboard — a shared free-draw canvas plus a "drawing telephone" relay game, with every call it made shown next to them.
 ---
 
 import WhiteboardDemo from '../../../components/examples/WhiteboardDemo.tsx';
@@ -48,7 +48,7 @@ package never sees it as anything but "the predicate said yes."
 The demo imports the published package and nothing else:
 
 ```ts
-import { createWhiteboardState } from '@insession/plugin-whiteboard-state';
+import { createWhiteboardState } from '@insession/extension-whiteboard';
 
 const whiteboard = createWhiteboardState({
   isOwnImageUrl: (url) => url.startsWith('https://cdn.example.com/uploads/'),
@@ -77,5 +77,5 @@ only "impure" thing anywhere in the package is `Date.now()`. Scheduling is
 yours, which is what lets the same state machine run on a server, in a test,
 or in this page.
 
-See the [package reference](/packages/plugin-whiteboard-state/) for the full
+See the [package reference](/packages/extension-whiteboard/) for the full
 action list and the persistence helpers (`restore`).

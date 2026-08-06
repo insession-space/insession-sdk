@@ -1,6 +1,6 @@
 ---
 title: 'ホワイトボード'
-description: '@insession/plugin-whiteboard-state の実動作デモ。共有の自由描画キャンバスと「お絵かき伝言ゲーム」を、その裏で呼ばれたコードを並べて確認できます。'
+description: '@insession/extension-whiteboard の実動作デモ。共有の自由描画キャンバスと「お絵かき伝言ゲーム」を、その裏で呼ばれたコードを並べて確認できます。'
 ---
 
 import WhiteboardDemo from '../../../../components/examples/WhiteboardDemo.tsx';
@@ -42,7 +42,7 @@ URL」以上の意味は一切見えません。
 デモが import しているのは、公開されているパッケージだけです:
 
 ```ts
-import { createWhiteboardState } from '@insession/plugin-whiteboard-state';
+import { createWhiteboardState } from '@insession/extension-whiteboard';
 
 const whiteboard = createWhiteboardState({
   isOwnImageUrl: (url) => url.startsWith('https://cdn.example.com/uploads/'),
@@ -71,4 +71,4 @@ if (delay !== null) {
 状態機械をサーバーでも、テストでも、このページでも動かせる理由です。
 
 アクションの全一覧と永続化のヘルパー（`restore`）は
-[パッケージのリファレンス](/ja/packages/plugin-whiteboard-state/)を参照してください。
+[パッケージのリファレンス](/ja/packages/extension-whiteboard/)を参照してください。

@@ -48,13 +48,15 @@ export default defineConfig({
           label: 'Packages',
           translations: { ja: 'パッケージ' },
           items: [
+            // 親パッケージなので先頭。ここから extension を組み立てる。
+            { label: 'space', slug: 'packages/space' },
             { label: 'ws-resilient-transport', slug: 'packages/ws-resilient-transport' },
             { label: 'space-state', slug: 'packages/space-state' },
-            { label: 'chat-state', slug: 'packages/chat-state' },
+            { label: 'extension-chat', slug: 'packages/extension-chat' },
             { label: 'space-state-react', slug: 'packages/space-state-react' },
-            { label: 'plugin-pomodoro-state', slug: 'packages/plugin-pomodoro-state' },
-            { label: 'plugin-whiteboard-state', slug: 'packages/plugin-whiteboard-state' },
-            { label: 'plugin-watch-party-state', slug: 'packages/plugin-watch-party-state' },
+            { label: 'extension-pomodoro', slug: 'packages/extension-pomodoro' },
+            { label: 'extension-whiteboard', slug: 'packages/extension-whiteboard' },
+            { label: 'extension-watch-party', slug: 'packages/extension-watch-party' },
           ],
         },
         {

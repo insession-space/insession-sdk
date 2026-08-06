@@ -1,6 +1,6 @@
 ---
 title: 'ポモドーロタイマー'
-description: '@insession/plugin-pomodoro-state の実動作デモ。状態機械を叩いてフェーズ遷移を見ながら、その裏で呼ばれたコードを並べて確認できます。'
+description: '@insession/extension-pomodoro の実動作デモ。状態機械を叩いてフェーズ遷移を見ながら、その裏で呼ばれたコードを並べて確認できます。'
 ---
 
 import PomodoroDemo from '../../../../components/examples/PomodoroDemo.tsx';
@@ -29,7 +29,7 @@ import PomodoroDemo from '../../../../components/examples/PomodoroDemo.tsx';
 デモが import しているのは、公開されているパッケージだけです:
 
 ```ts
-import { defaultState, onTimer, reduce, timerDelay } from '@insession/plugin-pomodoro-state';
+import { defaultState, onTimer, reduce, timerDelay } from '@insession/extension-pomodoro';
 
 let state = defaultState();
 
@@ -46,4 +46,4 @@ if (delay !== null) setTimeout(() => { state = onTimer(state); }, delay);
 あることが、同じ状態機械をサーバーでも、テストでも、このページでも動かせる理由です。
 
 アクションの全一覧と永続化のヘルパー（`restore` / `persistState`）は
-[パッケージのリファレンス](/ja/packages/plugin-pomodoro-state/)を参照してください。
+[パッケージのリファレンス](/ja/packages/extension-pomodoro/)を参照してください。

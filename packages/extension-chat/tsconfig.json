@@ -1,5 +1,5 @@
 {
-  // plugin-watch-party-state は DOM を使わない純粋な状態機械。tsc は型検査専用(noEmit)。
+  // extension-chat は DOM を使わない純粋な状態機械。tsc は型検査専用(noEmit)。
   // 配布物(dist)の生成は tsup が行う(tsup.config.ts)。
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {

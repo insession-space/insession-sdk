@@ -29,18 +29,18 @@ importers:
       '@astrojs/starlight':
         specifier: ^0.36.0
         version: 0.36.3(astro@5.18.2(@types/node@24.13.3)(lightningcss@1.33.0)(rollup@4.62.4)(typescript@5.9.3)(yaml@2.9.0))
-      '@insession/chat-state':
+      '@insession/extension-chat':
         specifier: workspace:*
-        version: link:../../packages/chat-state
-      '@insession/plugin-pomodoro-state':
+        version: link:../../packages/extension-chat
+      '@insession/extension-pomodoro':
         specifier: workspace:*
-        version: link:../../packages/plugin-pomodoro-state
-      '@insession/plugin-watch-party-state':
+        version: link:../../packages/extension-pomodoro
+      '@insession/extension-watch-party':
         specifier: workspace:*
-        version: link:../../packages/plugin-watch-party-state
-      '@insession/plugin-whiteboard-state':
+        version: link:../../packages/extension-watch-party
+      '@insession/extension-whiteboard':
         specifier: workspace:*
-        version: link:../../packages/plugin-whiteboard-state
+        version: link:../../packages/extension-whiteboard
       '@insession/space-state':
         specifier: workspace:*
         version: link:../../packages/space-state
@@ -73,7 +73,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/chat-state:
+  packages/extension-chat:
     devDependencies:
       tsup:
         specifier: ^8.3.5
@@ -82,7 +82,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/plugin-pomodoro-state:
+  packages/extension-pomodoro:
     devDependencies:
       tsup:
         specifier: ^8.3.5
@@ -91,7 +91,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/plugin-watch-party-state:
+  packages/extension-watch-party:
     devDependencies:
       tsup:
         specifier: ^8.3.5
@@ -100,7 +100,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/plugin-whiteboard-state:
+  packages/extension-whiteboard:
     devDependencies:
       tsup:
         specifier: ^8.3.5

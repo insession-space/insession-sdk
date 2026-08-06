@@ -16,20 +16,20 @@ import {
   type ChatPayload,
   type ChatState,
   createChatState,
-} from '@insession/chat-state';
+} from '@insession/extension-chat';
 import {
   type PomodoroState,
   defaultState as pomodoroDefaultState,
   onTimer as pomodoroOnTimer,
   reduce as pomodoroReduce,
   timerDelay as pomodoroTimerDelay,
-} from '@insession/plugin-pomodoro-state';
+} from '@insession/extension-pomodoro';
 import {
   createWatchParty,
   type WatchPartyEffect,
   type WatchPartyState,
-} from '@insession/plugin-watch-party-state';
-import { createWhiteboardState, type WhiteboardState } from '@insession/plugin-whiteboard-state';
+} from '@insession/extension-watch-party';
+import { createWhiteboardState, type WhiteboardState } from '@insession/extension-whiteboard';
 
 /** スペースに居る2人。実サーバーなら認証済みの接続から来る値。 */
 export const MEMBERS = [

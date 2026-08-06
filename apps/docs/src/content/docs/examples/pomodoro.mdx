@@ -1,6 +1,6 @@
 ---
 title: 'Pomodoro timer'
-description: A live demo of @insession/plugin-pomodoro-state — drive the state machine and watch the phase transitions, with every call it made shown next to them.
+description: A live demo of @insession/extension-pomodoro — drive the state machine and watch the phase transitions, with every call it made shown next to them.
 ---
 
 import PomodoroDemo from '../../../components/examples/PomodoroDemo.tsx';
@@ -32,7 +32,7 @@ changes when you press something or when a phase actually expires.
 The demo imports the published package and nothing else:
 
 ```ts
-import { defaultState, onTimer, reduce, timerDelay } from '@insession/plugin-pomodoro-state';
+import { defaultState, onTimer, reduce, timerDelay } from '@insession/extension-pomodoro';
 
 let state = defaultState();
 
@@ -49,5 +49,5 @@ if (delay !== null) setTimeout(() => { state = onTimer(state); }, delay);
 is yours, which is what lets the same state machine run on a server, in a test,
 or in this page.
 
-See the [package reference](/packages/plugin-pomodoro-state/) for the full
+See the [package reference](/packages/extension-pomodoro/) for the full
 action list and the persistence helpers (`restore` / `persistState`).

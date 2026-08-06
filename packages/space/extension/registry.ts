@@ -41,8 +41,8 @@ export interface ExtensionRegistryOptions {
    * Injected rather than fixed because the message that goes on the wire is
    * part of the host's protocol, not this package's: a host with its own
    * envelope, its own field names, or its own versioning needs to name those
-   * itself. (Same reasoning as `isOwnImageUrl` in `plugin-whiteboard-state`
-   * and `pickShuffleIndex` in `plugin-watch-party-state`: the piece that is
+   * itself. (Same reasoning as `isOwnImageUrl` in `extension-whiteboard`
+   * and `pickShuffleIndex` in `extension-watch-party`: the piece that is
    * genuinely host-specific gets injected instead of assumed.)
    */
   buildStateMessage?: (args: {
