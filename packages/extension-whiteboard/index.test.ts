@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import {
   createWhiteboardState,
   defaultState,
+  type WhiteboardReduceResult,
   type WhiteboardState,
   type WhiteboardStroke,
 } from './index.ts';
@@ -34,12 +35,17 @@ const rejectAllApi = createWhiteboardState({ isOwnImageUrl: () => false });
 // about the state transition, so they go through these unwrapping shims; the
 // effects themselves are asserted directly in the "Effects" section at the
 // bottom of this file, using `allowOwnApi` unwrapped.
+// `reduce`/`onTimer` may also return `{ effects }` with no `state` (the live
+// relay case), so the shims narrow before reaching for it.
+const stateOf = (r: WhiteboardReduceResult | null): WhiteboardState | null =>
+  r && 'state' in r ? r.state : null;
+
 function unwrapped(api: ReturnType<typeof createWhiteboardState>) {
   return {
     ...api,
     reduce: (state: any, action: string, payload?: any) =>
-      api.reduce(state, action, payload)?.state ?? null,
-    onTimer: (state: WhiteboardState) => api.onTimer(state)?.state ?? null,
+      stateOf(api.reduce(state, action, payload)),
+    onTimer: (state: WhiteboardState) => stateOf(api.onTimer(state)),
   };
 }
 const allowOwn = unwrapped(allowOwnApi);
@@ -778,7 +784,7 @@ function playRelayToAlbum() {
   let state = defaultState();
   const act = (action: string, payload?: any) => {
     const r = api.reduce(state, action, payload);
-    if (!r) return;
+    if (!r || !('state' in r)) return;
     state = r.state;
     effects.push(...r.effects);
   };
@@ -815,7 +821,7 @@ test('finishing a relay asks the host to store the album, exactly once', () => {
 
 test('free-draw edits produce no effects', () => {
   const r = allowOwnApi.reduce(defaultState(), 'add-stroke', { stroke: stroke('s1') });
-  assert.ok(r);
+  assert.ok(r && 'state' in r);
   assert.deepEqual(r.effects, []);
 });
 
@@ -823,7 +829,7 @@ test('a rematch produces its own single effect', () => {
   const { state, api } = playRelayToAlbum();
   // Back to the lobby: leaving album must not itself look like finishing.
   const reset = api.reduce(state, 'reset-game', { by: 'Ada' });
-  assert.ok(reset);
+  assert.ok(reset && 'state' in reset);
   assert.equal(reset.state.game?.phase, 'lobby');
   assert.deepEqual(reset.effects, []);
 });
@@ -835,7 +841,7 @@ test('a relay that ends on a phase timeout also asks the host to store it', () =
   let state = defaultState();
   const act = (action: string, payload?: any) => {
     const r = api.reduce(state, action, payload);
-    if (r) state = r.state;
+    if (r && 'state' in r) state = r.state;
   };
   act('set-mode', { mode: 'relay' });
   act('join-game', { by: 'Ada' });
@@ -847,7 +853,7 @@ test('a relay that ends on a phase timeout also asks the host to store it', () =
   act('submit-drawing', { by: 'Bob', imageUrl: `${ownPrefix}b.png` });
   // Nobody guesses; the phase expires instead.
   const fired = api.onTimer(state);
-  assert.ok(fired);
+  assert.ok(fired && 'state' in fired);
   assert.equal(fired.state.game?.phase, 'album');
   assert.equal(fired.effects.length, 1);
   assert.equal((fired.effects[0] as any).type, 'persist-relay-history');
@@ -858,14 +864,43 @@ test('a phase timeout that does not finish the game produces no effect', () => {
   let state = defaultState();
   const act = (action: string, payload?: any) => {
     const r = api.reduce(state, action, payload);
-    if (r) state = r.state;
+    if (r && 'state' in r) state = r.state;
   };
   act('set-mode', { mode: 'relay' });
   act('join-game', { by: 'Ada' });
   act('join-game', { by: 'Bob' });
   act('start-game', { by: 'Ada' });
   const fired = api.onTimer(state); // prompt phase expires -> draw
-  assert.ok(fired);
+  assert.ok(fired && 'state' in fired);
   assert.notEqual(fired.state.game?.phase, 'album');
   assert.deepEqual(fired.effects, []);
+});
+
+test('relay forwards a frame and changes nothing', () => {
+  // The one action that returns effects without a state. Going through the
+  // normal path would persist the board and re-arm the relay phase timer on
+  // every pointer move.
+  const frame = { kind: 'draw', channel: 'free', stroke: { id: 'p1' } };
+  const r = allowOwnApi.reduce(defaultState(), 'relay', { payload: frame });
+  assert.ok(r);
+  assert.equal('state' in r, false, 'no state change');
+  assert.deepEqual(r.effects, [{ type: 'relay', payload: frame }]);
+});
+
+test('relay passes the payload through untouched', () => {
+  // Deliberately opaque: what a live frame contains is a contract between the
+  // host's drawing client and its renderer, and it changes with that UI.
+  const weird = { anything: [1, 2, 3], nested: { deep: true }, n: null };
+  const r = allowOwnApi.reduce(defaultState(), 'relay', { payload: weird });
+  assert.ok(r);
+  assert.equal((r.effects[0] as { payload: unknown }).payload, weird, 'same reference');
+});
+
+test('relay works in every mode, including mid-game', () => {
+  // People draw *during* the relay game's draw phase — that is the whole point
+  // of the live preview — so it must not be gated on mode or phase.
+  const s = allowOwn.reduce(defaultState(), 'set-mode', { mode: 'relay' }) as WhiteboardState;
+  const r = allowOwnApi.reduce(s, 'relay', { payload: { kind: 'cursor', x: 1, y: 2 } });
+  assert.ok(r);
+  assert.equal((r.effects[0] as { type: string }).type, 'relay');
 });

@@ -169,7 +169,12 @@ export type WhiteboardAction =
   | 'reset-game'
   | 'submit-prompt'
   | 'submit-drawing'
-  | 'submit-guess';
+  | 'submit-guess'
+  /**
+   * Forward a live drawing frame to everyone else. Changes nothing and is
+   * never stored — see `relay` in the effects section.
+   */
+  | 'relay';
 
 /**
  * Payload shapes for each action. Fields are loosely typed because `reduce`
@@ -607,17 +612,39 @@ function submitToChain(
  * A finished relay game is the one thing here worth keeping past the session:
  * the album is the payoff, and it disappears when the space empties.
  */
-export type WhiteboardEffect = {
-  type: 'persist-relay-history';
-  players: string[];
-  chains: RelayChainEntry[][];
-};
+export type WhiteboardEffect =
+  | {
+      type: 'persist-relay-history';
+      players: string[];
+      chains: RelayChainEntry[][];
+    }
+  /**
+   * Forward this frame to everyone but the sender. Nothing is stored.
+   *
+   * ⚠ `payload` is **opaque on purpose**. What a live frame contains — a
+   * partial stroke, a whole board at reduced fidelity, a cursor position —
+   * is a contract between a host's drawing client and its own renderer, and
+   * it changes whenever that UI grows a feature. Teaching this package the
+   * shape would drag UI churn into a package that is supposed to be stable,
+   * so it passes through untouched and the host decides how it goes on the
+   * wire.
+   *
+   * What this package *does* decide is that the whiteboard accepts relay at
+   * all — an extension that never returns this effect simply cannot be
+   * relayed through.
+   */
+  | { type: 'relay'; payload: unknown };
 
-/** What `reduce`/`onTimer` return when they accept an action. */
-export interface WhiteboardReduceResult {
-  state: WhiteboardState;
-  effects: WhiteboardEffect[];
-}
+/**
+ * What `reduce`/`onTimer` return when they accept an action.
+ *
+ * Without `state` it means "run these effects, nothing changed" — the live
+ * relay case. `@insession/space` treats the two forms differently: the second
+ * neither stores, broadcasts the board, nor re-arms the phase timer.
+ */
+export type WhiteboardReduceResult =
+  | { state: WhiteboardState; effects: WhiteboardEffect[] }
+  | { effects: WhiteboardEffect[] };
 
 export interface WhiteboardStateApi {
   defaultState: () => WhiteboardState;
@@ -939,6 +966,14 @@ export function createWhiteboardState(options: {
     action: string,
     payload?: WhiteboardPayload,
   ): WhiteboardReduceResult | null {
+    // ⚠ Handled before the state machine, and returning effects *without* a
+    // state, because a live frame changes nothing. Going through the normal
+    // path would persist it, broadcast the board, and re-arm the relay phase
+    // timer on every pointer move — the last of which would keep a countdown
+    // that is supposed to run out from ever running out.
+    if (action === 'relay') {
+      return { effects: [{ type: 'relay', payload: payload?.payload }] };
+    }
     const prev = state || defaultState();
     const next = reduceState(state, action, payload);
     if (next === null) return null;
