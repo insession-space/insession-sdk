@@ -76,18 +76,33 @@ function defaultBuildStateMessage(args: { extension: string; state: unknown }): 
  * makes that collision essentially impossible without forcing simple
  * extensions to return an envelope they have no use for.
  */
-function splitResult<TState>(result: unknown): { state: TState; effects: unknown[] } {
-  if (
-    result &&
-    typeof result === 'object' &&
-    'state' in result &&
-    'effects' in result &&
-    Array.isArray((result as { effects: unknown }).effects)
-  ) {
-    const r = result as { state: TState; effects: unknown[] };
-    return { state: r.state, effects: r.effects };
+function splitResult<TState>(result: unknown): {
+  state: TState;
+  effects: unknown[];
+  changed: boolean;
+} {
+  if (result && typeof result === 'object' && 'effects' in result) {
+    const withEffects = result as { state?: TState; effects: unknown };
+    if (Array.isArray(withEffects.effects)) {
+      // `{ effects }` with no `state`: the transition asks for something to
+      // happen without changing anything. A live drawing relay is the case
+      // this exists for — every pointer frame is worth forwarding and none of
+      // it is worth storing.
+      //
+      // ⚠ `'state' in result` rather than `state !== undefined`: an extension
+      // whose slice legitimately *is* `undefined` would otherwise be read as
+      // "no state change" and silently stop updating.
+      if (!('state' in withEffects)) {
+        return { state: undefined as TState, effects: withEffects.effects, changed: false };
+      }
+      return {
+        state: withEffects.state as TState,
+        effects: withEffects.effects,
+        changed: true,
+      };
+    }
   }
-  return { state: result as TState, effects: [] };
+  return { state: result as TState, effects: [], changed: true };
 }
 
 export interface ExtensionRegistry {
@@ -184,7 +199,20 @@ export function createExtensionRegistry(
     nextSlice: unknown,
     rawEffects: unknown[],
     broadcast: { action: string; payload?: unknown },
+    changed: boolean,
   ): RegistryResult {
+    // ⚠ Nothing changed (the reducer returned `{ effects }` alone): hand back
+    // the **same** state object, and skip both the state broadcast and the
+    // timer. There is no new state to announce, and a timer derived from an
+    // unchanged slice would be the one already armed — re-arming it on every
+    // relay frame would reset a countdown that is supposed to be running out.
+    //
+    // Returning the same reference is the contract: a host can tell "nothing
+    // to persist" with `result.state === before`.
+    if (!changed) {
+      return { state, effects: tagExtensionEffects(ext.name, rawEffects) };
+    }
+
     const nextState: ExtensionState = { ...state, [ext.name]: nextSlice };
     const effects: SpaceEffect[] = [];
 
@@ -236,8 +264,8 @@ export function createExtensionRegistry(
       const result = ext.server.reduce(state[name] as never, action, payload as never);
       if (result === null || result === undefined) return null;
 
-      const { state: nextSlice, effects } = splitResult(result);
-      return finish(state, ext, nextSlice, effects, { action, payload });
+      const { state: nextSlice, effects, changed } = splitResult(result);
+      return finish(state, ext, nextSlice, effects, { action, payload }, changed);
     },
 
     timerDelay(state, name) {
@@ -257,11 +285,11 @@ export function createExtensionRegistry(
       const result = ext.server.onTimer(slice as never);
       if (result === null || result === undefined) return null;
 
-      const { state: nextSlice, effects } = splitResult(result);
+      const { state: nextSlice, effects, changed } = splitResult(result);
       // A timer firing is a state change like any other, so it broadcasts on
       // the same terms an action does — otherwise a Pomodoro would switch
       // phase on the server and nobody would be told.
-      return finish(state, ext, nextSlice, effects, { action: 'timer' });
+      return finish(state, ext, nextSlice, effects, { action: 'timer' }, changed);
     },
 
     persist(state) {

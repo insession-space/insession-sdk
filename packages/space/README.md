@@ -150,7 +150,7 @@ Identity function for inference. Throws if `name` is missing or empty.
 | Member | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `defaultState` | `() => S` | ✅ | Fresh slice; also the fallback when a restore yields nothing. |
-| `reduce` | `(state, action: string, payload?) => S \| { state: S; effects: E[] } \| null` | ✅ | `null` means invalid or no-op: no state change, no effects, no broadcast. Either return shape is accepted. |
+| `reduce` | `(state, action: string, payload?) => S \| { state: S; effects: E[] } \| { effects: E[] } \| null` | ✅ | `null` means invalid or no-op: nothing at all happens. `{ effects }` alone means "run these, but nothing changed" — see below. |
 | `timerDelay` | `(state: S) => number \| null` | — | Milliseconds until this slice's next event. |
 | `onTimer` | `(state: S) => S \| { state; effects } \| null` | — | Called when that timer fires. |
 | `restore` | `(raw: unknown) => S \| null` | — | Normalizes a slice from storage. Without it, the slice is treated as session-only. |
@@ -203,6 +203,41 @@ Every message builder is injectable because the envelope on the wire is your pro
 | `{ type: 'extension', extension, effect }` | A domain-specific effect, tagged with its origin. |
 
 Every accepted extension transition ends with exactly one of `schedule-timer` / `clear-timer`, re-derived from the new state. Applying them unconditionally is what keeps an armed timer honest across pause, restart, and stop.
+
+### Forwarding without storing
+
+A live relay — a drawing preview streaming a frame per pointer move — is worth
+forwarding to the other members and not worth keeping. Return `{ effects }`
+with no `state`:
+
+```ts
+reduce(state, action, payload) {
+  if (action === 'frame') {
+    return { effects: [{ type: 'broadcast', message: { type: 'frame', payload }, excludeSender: true }] };
+  }
+  ...
+}
+```
+
+Nothing is stored, **no state broadcast goes out, and no timer is re-armed** —
+a timer derived from an unchanged slice is the one already running, and
+re-arming it every frame would reset a countdown that is supposed to run out.
+
+`applyAction` hands back the **same state object** in this case, so a host can
+skip its write with a reference check:
+
+```ts
+const result = registry.applyAction(slices, name, action, payload);
+if (result) {
+  if (result.state !== slices) await db.save(spaceId, registry.persist(result.state));
+  slices = result.state;
+  for (const effect of result.effects) run(effect);
+}
+```
+
+⚠ This is not `null`. `null` means the action was invalid or a no-op and
+**nothing at all** happens; `{ effects }` means something should happen, just
+not to the state.
 
 ### Pure layer
 

@@ -389,3 +389,87 @@ test('clientExtensions produces PluginClient-shaped objects', () => {
     lines: [{ kind: 'log' }],
   });
 });
+
+// ── Effects with no state change ───────────────────────────────────────────
+//
+// A live relay (a drawing preview streaming a frame per pointer move) is worth
+// forwarding and not worth storing. `{ effects }` alone says exactly that.
+
+/** Echoes whatever it is handed, without touching state. */
+const Relay = defineSpaceExtension<{ n: number }>({
+  name: 'relay',
+  server: {
+    defaultState: () => ({ n: 0 }),
+    reduce(state, action, payload) {
+      if (action === 'frame') {
+        return {
+          effects: [
+            { type: 'broadcast', message: { type: 'frame', payload }, excludeSender: true },
+          ],
+        };
+      }
+      if (action === 'bump') return { n: (state?.n ?? 0) + 1 };
+      return null;
+    },
+    timerDelay: () => 5_000,
+    onTimer: (s) => s,
+  },
+});
+
+test('an effects-only result runs its effects and nothing else', () => {
+  const r = createExtensionRegistry([Relay as SpaceExtension]);
+  const before = r.initState();
+  const result = r.applyAction(before, 'relay', 'frame', { x: 1 });
+  assert.ok(result);
+
+  assert.deepEqual(result.effects, [
+    { type: 'broadcast', message: { type: 'frame', payload: { x: 1 } }, excludeSender: true },
+  ]);
+  // No state broadcast, and — importantly — no timer effect. Re-arming on every
+  // frame would keep resetting a countdown that is supposed to run out.
+  assert.equal(
+    result.effects.some((e: SpaceEffect) => e.type === 'schedule-timer'),
+    false,
+  );
+});
+
+test('an effects-only result hands back the same state object, so a host can skip persisting', () => {
+  const r = createExtensionRegistry([Relay as SpaceExtension]);
+  const before = r.initState();
+  const result = r.applyAction(before, 'relay', 'frame', { x: 1 });
+  assert.ok(result);
+  assert.equal(result.state, before, 'same reference — nothing to write');
+
+  // A real state change still produces a new object, as before.
+  const bumped = r.applyAction(before, 'relay', 'bump');
+  assert.ok(bumped);
+  assert.notEqual(bumped.state, before);
+  assert.deepEqual(bumped.state.relay, { n: 1 });
+});
+
+test('effects-only is not the same as null', () => {
+  const r = createExtensionRegistry([Relay as SpaceExtension]);
+  const before = r.initState();
+  // `null` means "nothing at all happened".
+  assert.equal(r.applyAction(before, 'relay', 'bogus'), null);
+  // `{ effects }` means "something should happen, just not to the state".
+  assert.equal(r.applyAction(before, 'relay', 'frame', {})?.effects.length, 1);
+});
+
+test('a slice that is legitimately undefined still counts as a state change', () => {
+  // The check is `'state' in result`, not `state !== undefined` — otherwise an
+  // extension whose slice really is `undefined` would silently stop updating.
+  const Undef = defineSpaceExtension({
+    name: 'undef',
+    server: {
+      defaultState: () => ({ v: 1 }),
+      reduce: () => ({ state: undefined, effects: [] }),
+    },
+  });
+  const r = createExtensionRegistry([Undef as SpaceExtension]);
+  const before = r.initState();
+  const result = r.applyAction(before, 'undef', 'clear');
+  assert.ok(result);
+  assert.notEqual(result.state, before, 'treated as a change');
+  assert.equal(result.state.undef, undefined);
+});
