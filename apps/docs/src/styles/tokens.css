@@ -13,8 +13,15 @@
  * こちらを直す必要は無く、上げたいときに版を上げるだけ）。
  *
  * ⚠ **色の値をこのファイルに書き足さないこと。** 値の正は DS の `--color-*`。
- * ここが持つのは「DS の変数を Starlight の `--sl-color-*` へどう割り当てるか」だけ。
+ * ここが持つのは「DS の変数を Starlight の `--sl-color-*` へどう割り当てるか」だけで、
  * 新しい色が要るなら DS 側に足す。
+ *
+ * **例外は Starlight の中間グレー4段と accent-low の計8個だけ**（下の各ブロックに
+ * `※DS に無い` と印を付けてある）。Starlight は `--sl-color-gray-1`〜`gray-4` という
+ * 明度の階段と、accent の淡い面 `--sl-color-accent-low` を要求するが、**DS はどちらも
+ * 持っていない**（DS の面は bg / bg-elevated / surface / surface-hover という役割名の
+ * 体系で、汎用のグレースケールを配らない）。無いものは参照しようがないので、
+ * ここだけ hex を直接置いている。**DS にグレースケールが入ったら、ここを var() へ寄せること。**
  *
  * ⚠ **accent と accent-soft の役割を混ぜないこと（DS の #122）。**
  *   --color-accent      … 塗り専用（ボタン・バッジ・枠）。基準は 1.4.11 の 3:1
@@ -54,16 +61,16 @@
 
   /* ── Starlight のテーマ変数へ写す ────────────────────────── */
   --sl-color-white: var(--ds-text);
-  --sl-color-gray-1: #e6e2d7;
-  --sl-color-gray-2: #c9c5b8;
+  --sl-color-gray-1: #e6e2d7; /* ※DS に無い（グレースケールを配らないため） */
+  --sl-color-gray-2: #c9c5b8; /* ※DS に無い */
   --sl-color-gray-3: var(--ds-text-dim);
-  --sl-color-gray-4: #6d685c;
+  --sl-color-gray-4: #6d685c; /* ※DS に無い */
   --sl-color-gray-5: var(--ds-border-strong);
   --sl-color-gray-6: var(--ds-surface);
   --sl-color-gray-7: var(--ds-bg-elevated);
   --sl-color-black: var(--ds-bg);
 
-  --sl-color-accent-low: #4a201a;
+  --sl-color-accent-low: #4a201a; /* ※DS に無い（accent の淡い面を持たないため） */
   --sl-color-accent: var(--ds-accent);
   --sl-color-accent-high: var(--ds-accent-soft);
 
@@ -82,16 +89,16 @@
  * 指しているので、DS 自身の :root[data-theme="light"] が切り替えたぶんが自動で届く。 */
 :root[data-theme="light"] {
   --sl-color-white: var(--ds-text);
-  --sl-color-gray-1: #2b2a22;
-  --sl-color-gray-2: #45443a;
+  --sl-color-gray-1: #2b2a22; /* ※DS に無い */
+  --sl-color-gray-2: #45443a; /* ※DS に無い */
   --sl-color-gray-3: var(--ds-text-dim);
-  --sl-color-gray-4: #78766a;
+  --sl-color-gray-4: #78766a; /* ※DS に無い */
   --sl-color-gray-5: var(--ds-border-strong);
   --sl-color-gray-6: var(--ds-surface-hover);
   --sl-color-gray-7: var(--ds-bg-elevated);
   --sl-color-black: var(--ds-surface);
 
-  --sl-color-accent-low: #ffe1d8;
+  --sl-color-accent-low: #ffe1d8; /* ※DS に無い */
   --sl-color-accent: var(--ds-accent);
   --sl-color-accent-high: var(--ds-accent-soft);
 

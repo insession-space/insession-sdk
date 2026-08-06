@@ -95,8 +95,10 @@ export default defineConfig({
             },
             { label: 'chat', translations: { ja: 'チャット' }, slug: 'examples/chat' },
             {
+              // ⚠ ja のラベルはページ自身の frontmatter `title` と同じ語にすること。
+              // サイドバーと見出しで別の呼び方をすると、同じページが2つあるように読める。
               label: 'space-state',
-              translations: { ja: '状態ストア' },
+              translations: { ja: 'スペースの状態' },
               slug: 'examples/space-state',
             },
             {
