@@ -1,35 +1,42 @@
 /**
- * `createSpace` — the instance a host drives.
+ * `createSpace` — the instance a host drives, and the one place the two
+ * halves of a space are composed.
  *
- * This is the ergonomic layer over the pure pieces (`createExtensionRegistry`
- * and the functions in `room.ts`): it owns the room state so a host does not
- * have to thread it through every call, and every method returns the effects
- * to run.
+ * `members/` knows who is connected and nothing about extensions.
+ * `extension/` knows how features fold state and nothing about who is
+ * connected. This file is where they meet, which is also why `SpaceState`
+ * lives here rather than in either of them.
  *
- * The pure layer stays exported. A host that wants to own the state itself —
- * to keep it in a database row, to snapshot it per revision, to run it inside
- * something that already has its own state discipline — can use those
+ * It is the ergonomic layer: it owns the state so a host does not have to
+ * thread it through every call, and every method returns the effects to run.
+ * The pure pieces stay exported — a host that wants to own the state itself
+ * (to keep it in a database row, to snapshot it per revision, to run it
+ * inside something that already has its own state discipline) can use those
  * directly and ignore this file.
  */
 import type { SpaceEffect } from './effects.ts';
-import type { SpaceExtension } from './extension.ts';
+import type { SpaceExtension } from './extension/contract.ts';
 import {
   createExtensionRegistry,
   type ExtensionRegistryOptions,
   type ExtensionState,
-} from './registry.ts';
-import {
-  addConnection,
-  dedupeByUid,
-  findMember,
-  hasConnection,
-  isFirstConnectionOfUid,
-  isLastConnectionOfUid,
-  type RoomState,
-  removeConnection,
-  type SpaceMember,
-  setPresence,
-} from './room.ts';
+} from './extension/registry.ts';
+import { isFirstConnectionOfUid, isLastConnectionOfUid } from './members/identity.ts';
+import { addConnection, findMember, hasConnection, removeConnection } from './members/list.ts';
+import { dedupeByUid, setPresence } from './members/presence.ts';
+import type { SpaceMember } from './members/types.ts';
+
+/**
+ * The whole space: who is connected, plus each extension's slice.
+ *
+ * Not to be confused with the `SpaceState` in `@insession/space-state`, which
+ * is a *client's* projection of a space. This one is the server-authoritative
+ * whole, and is the only thing `getState` ever returns.
+ */
+export interface SpaceState {
+  members: SpaceMember[];
+  extensions: ExtensionState;
+}
 
 /** What `join` needs to know about the arriving connection. `presence` defaults to `'active'`. */
 export interface JoinInput {
@@ -62,27 +69,27 @@ export interface CreateSpaceOptions extends ExtensionRegistryOptions {
 }
 
 export interface Space {
-  /** The whole room. Treated as immutable — every transition replaces it. */
-  getState: () => RoomState;
+  /** The whole space. Treated as immutable — every transition replaces it. */
+  getState: () => SpaceState;
   /** Live connections, one entry per socket. */
   members: () => SpaceMember[];
   /** One entry per person: the same account on two devices counts once. */
   people: () => SpaceMember[];
-  /** No connections left. What a host checks before disposing the room. */
+  /** No connections left. What a host checks before disposing the space. */
   isEmpty: () => boolean;
 
   /**
    * Adds a connection.
    *
    * Always replies to the arriving connection with a full snapshot, and
-   * announces the arrival to the room *only* when this is the person's first
-   * connection — a second device is not a second arrival.
+   * announces the arrival to everyone else *only* when this is the person's
+   * first connection — a second device is not a second arrival.
    */
   join: (input: JoinInput) => SpaceEffect[];
   /**
-   * Removes a connection. Announces a departure only when it was the
-   * person's last one. An unknown `connId` is a no-op returning no effects,
-   * so a duplicate disconnect is harmless.
+   * Removes a connection. Announces a departure only when it was the person's
+   * last one. An unknown `connId` is a no-op returning no effects, so a
+   * duplicate disconnect is harmless.
    */
   leave: (connId: string) => SpaceEffect[];
   /** Changes one connection's presence. A no-op change produces no effects. */
@@ -135,7 +142,7 @@ export function createSpace(options: CreateSpaceOptions): Space {
   } = options;
 
   const registry = createExtensionRegistry(extensions, registryOptions);
-  let state: RoomState = { members: [], extensions: registry.initState() };
+  let state: SpaceState = { members: [], extensions: registry.initState() };
 
   return {
     getState: () => state,
@@ -167,7 +174,7 @@ export function createSpace(options: CreateSpaceOptions): Space {
         },
       ];
       // A re-join on a connection that is already here is a correction, not
-      // an arrival — announcing it would put the same person in the room log
+      // an arrival — announcing it would list the same person as arriving
       // twice.
       if (first && !rejoin) {
         effects.push({

@@ -8,7 +8,7 @@
 
 | ディレクトリ | パッケージ | 内容 | 依存 |
 | --- | --- | --- | --- |
-| `packages/space` | `@insession/space` | **space の親。** ヘッドレスなスペースを extension の集合として組み立てるエンジン。extension 契約（`defineSpaceExtension`）・集約 registry（`createExtensionRegistry`）・room ライフサイクル（members / presence / 入退室。`room.ts`）・インスタンス（`createSpace`）を持つ。I/O は一切行わず effect 記述子を返すだけで、WS とストレージは利用者が自前で持つ | **なし** |
+| `packages/space` | `@insession/space` | **space の親。** ヘッドレスなスペースを extension の集合として組み立てるエンジン。extension 契約（`defineSpaceExtension`）・集約 registry（`createExtensionRegistry`）・参加者ライフサイクル（members / presence / 参加・離脱。`members/`）・インスタンス（`createSpace`）を持つ。I/O は一切行わず effect 記述子を返すだけで、WS とストレージは利用者が自前で持つ | **なし** |
 | `packages/ws-resilient-transport` | `@insession/ws-resilient-transport` | 本番デプロイの都合に合わせて再接続する WebSocket トランスポート（サービス再起動時の高速再接続 / ジッター付き指数バックオフ / terminal close code） | **なし** |
 | `packages/space-state` | `@insession/space-state` | transport・フレームワーク非依存のスペース状態 store。受信は純粋 reducer、送信は `onSend` に流すだけ、副作用は effect 記述子で返すだけ | **なし** |
 | `packages/space-state-react` | `@insession/space-state-react` | 上を React の `useSyncExternalStore` に繋ぐ薄いラッパー（1関数） | `space-state` / peer に `react` |
@@ -21,7 +21,7 @@
 
 **⚠ `space` が状態機械パッケージに依存しないのは意図的。** 親パッケージが特定の実装を import すると「どの状態機械を使うか」を契約側が決めてしまう。`space` は既存4つが**既に満たしている形**（`defaultState` / `reduce` / `timerDelay` / `onTimer` / `restore` / `persistState`）を型として言語化しただけなので、消費側が `defineSpaceExtension({ name, server: <既存パッケージの API> })` と書けば構造的に嵌る。逆向き（状態機械側が `space` を import する）も同じ理由で足さないこと — 依存ゼロが売りのパッケージにランタイム依存が1つ増える。
 
-**⚠ `space` を細かく割らないこと。** 契約・registry・room・インスタンスは1パッケージに同居させる。**これらは必ず一緒に変わる**ので、別採番にすると契約にフィールドを1つ足すたびに2パッケージ2版の組み合わせが増え、消費側が版合わせを強いられる。加えて、契約だけを単体で install する人は居ない（それだけでは space が建たない）。**単体で install されないものはパッケージにしない。** `@tiptap/core` が `Editor` と `Extension` を同居させているのと同じ判断。
+**⚠ `space` を細かく割らないこと。** 契約・registry・members・インスタンスは1パッケージに同居させる。**これらは必ず一緒に変わる**ので、別採番にすると契約にフィールドを1つ足すたびに2パッケージ2版の組み合わせが増え、消費側が版合わせを強いられる。加えて、契約だけを単体で install する人は居ない（それだけでは space が建たない）。**単体で install されないものはパッケージにしない。** `@tiptap/core` が `Editor` と `Extension` を同居させているのと同じ判断。
 
 **⚠ `space-core` という名前を使わないこと。** `insession-app` に `@in-session/space-core`（React・UI 込み・private）が実在する。ハイフン1つしか違わないのに責務が正反対で、しかも `insession-app` では**両方が同時にインストールされる**。補完で選び間違えても型が合うまで気づけない。
 

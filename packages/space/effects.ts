@@ -24,7 +24,7 @@
  * `'persist'` without colliding.
  */
 export type SpaceEffect =
-  /** Send `message` to the room. With `excludeSender`, everyone but whoever triggered the action. */
+  /** Send `message` to everyone in the space. With `excludeSender`, everyone but whoever triggered the action. */
   | { type: 'broadcast'; message: unknown; excludeSender?: boolean }
   /** Send `message` only to whoever triggered the action. */
   | { type: 'send-to-sender'; message: unknown }

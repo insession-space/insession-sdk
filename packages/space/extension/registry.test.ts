@@ -6,7 +6,7 @@ import {
   type ExtensionState,
   type SpaceEffect,
   type SpaceExtension,
-} from './index.ts';
+} from '../index.ts';
 
 // The fixtures below deliberately mirror the two reducer shapes that already
 // exist in this repo, so the contract is exercised against real signatures

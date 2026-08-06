@@ -16,14 +16,14 @@
  *
  * **2. Every slice is namespaced.** Extension state lives at
  * `extensionState[extension.name]` and nowhere else. Flattening slices onto a
- * shared room object works while the extensions are known in advance and
+ * shared space object works while the extensions are known in advance and
  * their keys are known not to collide — neither holds once extensions come
  * from outside.
  */
-import { type SpaceEffect, tagExtensionEffects } from './effects.ts';
-import type { SpaceExtension } from './extension.ts';
+import { type SpaceEffect, tagExtensionEffects } from '../effects.ts';
+import type { SpaceExtension } from './contract.ts';
 
-/** The extension half of room state: one namespaced slice per extension. */
+/** The extension half of a space's state: one namespaced slice per extension. */
 export type ExtensionState = Record<string, unknown>;
 
 /** What an accepted transition produces. */

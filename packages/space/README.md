@@ -2,7 +2,7 @@
 
 Build a headless realtime space out of extensions, the way a headless editor is built out of plugins.
 
-You bring your own WebSocket server and your own storage. This package owns what sits between them: **who is in the room**, **which extension owns which slice of its state**, **how an action reaches the right reducer**, **when a timer needs re-arming**, and **what goes to storage and comes back**.
+You bring your own WebSocket server and your own storage. This package owns what sits between them: **who is connected**, **which extension owns which slice of its state**, **how an action reaches the right reducer**, **when a timer needs re-arming**, and **what goes to storage and comes back**.
 
 Nothing here performs I/O. Every transition returns **effect descriptors** — you run them. That is what lets the same space run on a `ws` server, a Durable Object, or a test with no network at all.
 
@@ -68,7 +68,7 @@ function run(effects, ws) {
   for (const effect of effects) {
     switch (effect.type) {
       case 'broadcast':
-        sendToRoom(effect.message, { exclude: effect.excludeSender ? ws : undefined });
+        sendToEveryone(effect.message, { exclude: effect.excludeSender ? ws : undefined });
         break;
       case 'send-to-sender':
         ws.send(JSON.stringify(effect.message));
@@ -91,7 +91,7 @@ function run(effects, ws) {
 
 `broadcast` and `send-to-sender` are core, so they are handled once and work for every extension. Anything else an extension emits arrives as `{ type: 'extension', extension, effect }` — extensions never have to agree on a shared vocabulary, and two of them can both emit a `persist` effect without colliding.
 
-### Who is in the room
+### Who is connected
 
 `members()` is one entry per socket, which is what you deliver to. `people()` collapses them by account, which is what you display.
 
@@ -124,7 +124,7 @@ const store = createSpaceStore({ ...opts, plugins: space.clientExtensions() });
 
 ### Owning the state yourself
 
-`createSpace` holds the room state for you. If your host already has its own state discipline — a database row, a snapshot per revision, an actor framework — the pure layer underneath is exported too: `createExtensionRegistry` plus the functions in `room.ts` take state in and hand it back.
+`createSpace` holds the state for you. If your host already has its own state discipline — a database row, a snapshot per revision, an actor framework — the pure layer underneath is exported too: `createExtensionRegistry` plus the functions under `members/` take state in and hand it back.
 
 ```ts
 const registry = createExtensionRegistry([Counter, Chat]);
@@ -196,7 +196,7 @@ Every message builder is injectable because the envelope on the wire is your pro
 
 | Effect | Meaning |
 | --- | --- |
-| `{ type: 'broadcast', message, excludeSender? }` | Send to the room. |
+| `{ type: 'broadcast', message, excludeSender? }` | Send to everyone in the space. |
 | `{ type: 'send-to-sender', message }` | Send only to whoever triggered the action. |
 | `{ type: 'schedule-timer', extension, delayMs }` | Arm a timer, replacing any already armed for that extension. |
 | `{ type: 'clear-timer', extension }` | Cancel it. |
@@ -208,7 +208,7 @@ Every accepted extension transition ends with exactly one of `schedule-timer` / 
 
 `createExtensionRegistry(extensions, options?)` — `names`, `has`, `get`, `initState`, `applyAction`, `timerDelay`, `applyTimer`, `persist`, `restore`, `clientExtensions`.
 
-Room functions over a plain `SpaceMember[]` — `addConnection`, `removeConnection`, `setPresence`, `findMember`, `hasConnection`, `isFirstConnectionOfUid`, `isLastConnectionOfUid`, `dedupeByUid`.
+Member functions over a plain `SpaceMember[]` — `addConnection`, `removeConnection`, `setPresence`, `findMember`, `hasConnection`, `isFirstConnectionOfUid`, `isLastConnectionOfUid`, `dedupeByUid`.
 
 ## Test
 

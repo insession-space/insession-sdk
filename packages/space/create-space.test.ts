@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { createSpace } from './create-space.ts';
 import type { SpaceEffect } from './effects.ts';
-import { defineSpaceExtension } from './extension.ts';
-import { createSpace } from './space.ts';
+import { defineSpaceExtension } from './extension/contract.ts';
 
 const Counter = defineSpaceExtension<{ count: number; running: boolean }>({
   name: 'counter',
@@ -156,7 +156,7 @@ test('snapshot and hydrate round-trip the extension slices, leaving members alon
   fresh.join({ connId: 'x', name: 'Bob' });
   fresh.hydrate(stored);
   assert.deepEqual(fresh.getState().extensions.counter, { count: 1, running: false });
-  assert.equal(fresh.members().length, 1, 'hydrate does not touch who is in the room');
+  assert.equal(fresh.members().length, 1, 'hydrate does not touch who is connected');
 });
 
 test('armTimers re-derives every extension timer after a restart', () => {

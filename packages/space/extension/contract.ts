@@ -26,14 +26,14 @@ export type ExtensionReduceResult<TState, TEffect> = TState | { state: TState; e
 
 /**
  * The server-authoritative half of an extension: pure functions over a slice
- * of room state.
+ * of space state.
  *
  * Only `defaultState` and `reduce` are required. An extension with no timers
  * omits `timerDelay`/`onTimer`; one whose state is entirely session-scoped
  * omits `restore`/`persistState`.
  */
 export interface ExtensionServerFacet<TState = any, TPayload = any, TEffect = any> {
-  /** The slice's initial value, used for a fresh room and as the fallback when a restore yields nothing. */
+  /** The slice's initial value, used for a fresh space and as the fallback when a restore yields nothing. */
   defaultState: () => TState;
   /**
    * Applies an action to the slice.
@@ -84,7 +84,7 @@ export interface ExtensionClientFacet<TLocal = any> {
 
 /** One extension: a name, and whichever halves it participates in. */
 export interface SpaceExtension<TState = any, TPayload = any, TEffect = any, TOptions = unknown> {
-  /** Unique within a space. Also the key its slice occupies in room state. */
+  /** Unique within a space. Also the key its slice occupies in space state. */
   name: string;
   /** Whatever the extension was configured with. This package never reads it; it is carried for the host. */
   options?: TOptions;
