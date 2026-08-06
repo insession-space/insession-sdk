@@ -22,7 +22,25 @@
  * effects, nothing broadcast. This matters on a wire boundary, where the
  * action name is untrusted input.
  */
-export type ExtensionReduceResult<TState, TEffect> = TState | { state: TState; effects: TEffect[] };
+export type ExtensionReduceResult<TState, TEffect> =
+  | TState
+  | { state: TState; effects: TEffect[] }
+  /**
+   * Effects with **no state change**. Nothing is stored, nothing is
+   * broadcast about the state, and no timer is re-armed — only these effects
+   * run.
+   *
+   * This is what a live relay needs: a drawing preview streams a frame per
+   * pointer move, every one worth forwarding to the other members and none
+   * worth keeping. Without this form the only way to say "forward this" would
+   * be to invent a state change, which would persist and broadcast on every
+   * frame.
+   *
+   * ⚠ Not the same as `null`. `null` means the action was invalid or a no-op
+   * and **nothing at all** happens; this means something should happen, just
+   * not to the state.
+   */
+  | { effects: TEffect[] };
 
 /**
  * The server-authoritative half of an extension: pure functions over a slice
