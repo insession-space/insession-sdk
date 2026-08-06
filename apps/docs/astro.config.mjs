@@ -61,6 +61,11 @@ export default defineConfig({
           label: 'Examples',
           translations: { ja: 'デモ' },
           items: [
+            {
+              label: 'the whole space',
+              translations: { ja: 'スペース全体' },
+              slug: 'examples/space',
+            },
             { label: 'pomodoro', slug: 'examples/pomodoro' },
             { label: 'whiteboard', slug: 'examples/whiteboard' },
             { label: 'watch-party', slug: 'examples/watch-party' },

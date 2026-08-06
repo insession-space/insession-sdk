@@ -252,6 +252,122 @@
   font-style: italic;
 }
 
+/* ── 統合デモ(/examples/space)のスペース画面 ─────────────────
+ *
+ * 他のデモは「操作 / 状態 / トレース」の2ペインだが、ここだけは1枚のスペース画面
+ * （在室メンバー / スイッチャー / チャット）を組む。色・角丸・境界は上と同じものを使い、
+ * 新しい色は作らない。1px の gap を背景色で見せる罫線にしているのも .demo-body と同じ。
+ */
+
+/* ⚠ 3カラム（在室 / ステージ / チャット）にはしないこと。Starlight の本文カラムは
+ * 広い画面でも 45rem 程度しかなく、3列にするとどの列も読めない幅に潰れる（実測で各列
+ * 130px 前後）。在室メンバーは上段の横並びバーに逃がし、下段だけを2列にしてある。 */
+.space-screen {
+  display: grid;
+  gap: 1px;
+  background: var(--ds-border);
+  border-top: 1px solid var(--ds-border);
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "rail"
+    "stage"
+    "chat";
+}
+
+@media (min-width: 52rem) {
+  .space-screen {
+    grid-template-columns: 1.15fr 1fr;
+    grid-template-areas:
+      "rail rail"
+      "stage chat";
+  }
+}
+
+.space-rail,
+.space-stage,
+.space-chatpane {
+  background: var(--ds-bg-elevated);
+  padding: 1.15rem;
+  /* grid の子は既定で min-width:auto のため、中の <pre> が伸びると列が押し広げられる。 */
+  min-width: 0;
+}
+
+.space-rail {
+  grid-area: rail;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.7rem;
+}
+
+.space-stage {
+  grid-area: stage;
+}
+
+.space-chatpane {
+  grid-area: chat;
+}
+
+/* 在室バーの中では .demo-label の下マージンが効くと縦位置がずれる。 */
+.space-rail .demo-label {
+  margin: 0;
+}
+
+.space-member {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--ds-border);
+  border-radius: 0.6rem;
+  font-family: var(--__sl-font-mono, ui-monospace, monospace);
+}
+
+/* 今操作している側だけ縁取る（塗りにはしない。accent の塗りは primary ボタン専用）。 */
+.space-member[data-self] {
+  border-color: var(--ds-accent);
+}
+
+.space-member-name {
+  font-size: 0.85rem;
+  color: var(--ds-text);
+}
+
+.space-member-meta {
+  font-size: 0.68rem;
+  color: var(--ds-text-faint);
+  overflow-wrap: anywhere;
+}
+
+.space-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1.1rem;
+}
+
+/* 補足の地の文。⚠ .demo-readout を流用しないこと — あちらは white-space: pre なので、
+ * 折り返さずに横スクロールバーが出る（デモの中に読めない一文が残る）。 */
+.space-note {
+  font-size: 0.76rem;
+  line-height: 1.7;
+  margin: 0;
+  color: var(--ds-text-faint);
+}
+
+.space-note code {
+  font-family: var(--__sl-font-mono, ui-monospace, monospace);
+  font-size: 0.95em;
+  overflow-wrap: anywhere;
+}
+
+/* チャットは行数が伸びるので、ここだけスクロールさせて画面の高さを固定する。 */
+.space-log {
+  max-height: 13rem;
+  overflow: auto;
+  margin-bottom: 1rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .demo-btn {
     transition: none;
