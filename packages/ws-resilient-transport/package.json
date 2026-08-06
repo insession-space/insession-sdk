@@ -39,6 +39,8 @@
     "registry": "https://registry.npmjs.org"
   },
   "scripts": {
+    "//prepublishOnly": "publish の直前に必ずビルドし直す。dist は .gitignore されているので、ビルドせずに publish すると files に列挙した dist が入らないまま出る — しかも npm は成功扱いなので、install して初めて ERR_MODULE_NOT_FOUND で気づく（実際に extension-* の初版4つを空で publish して踏んだ）。同じ版は上書きできないため、踏むと patch を上げて出し直すしかない。",
+    "prepublishOnly": "npm run build",
     "build": "tsup",
     "test": "node --test",
     "typecheck": "tsc --noEmit -p tsconfig.json"

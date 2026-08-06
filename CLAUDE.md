@@ -94,6 +94,22 @@ Changesets で採番し、`main` への push で npm publish する。
 >
 > 落ちても壊れるものは無い。採番のコミットが `main` に載るだけなので、原因を潰してから手動 publish するか、失敗した run を再実行すればよい。
 
+### ⚠ 手動 publish の前に必ず `pnpm build` する（実際に4パッケージを空で出した）
+
+**`dist` は `.gitignore` されている。ビルドせずに publish すると、`files` に列挙した `dist` が入らないまま出る。** しかも npm は成功として扱うので、その場では何も分からない。**install して初めて `ERR_MODULE_NOT_FOUND` で気づく。**
+
+`@insession/extension-*` の初版4つ（`extension-pomodoro@0.2.0` / `extension-whiteboard@0.2.0` / `extension-watch-party@0.4.0` / `extension-chat@0.2.0`）を実際にこの形で出してしまった。中身は `README.md` / `LICENSE` / `CHANGELOG.md` / `package.json` の4ファイルだけで、import できない。
+
+**npm は同じ版を上書きできない。** 踏んだら patch を上げて出し直し、壊れた版を deprecate するしかない。
+
+対策として全パッケージに `prepublishOnly` を入れてある:
+
+```json
+"prepublishOnly": "npm run build",
+```
+
+**これを消さないこと。** ただし `npm publish --dry-run` は `prepublishOnly` を走らせないので、**dry-run では検出できない**（`total files: 4` のまま通ってしまう）。手で確認するなら `ls dist` を見ること。
+
 ### ローカルから publish しない（既存パッケージの話）
 
 npm はアカウントの 2FA か bypass 2FA 付きトークンを要求するうえ、手元から出すと **provenance の無い版がレジストリに残る**。publish は CI（OIDC）経由が基本。**上記のとおり新規パッケージの初回だけが例外**で、それ以外で手元から出す理由は無い。
