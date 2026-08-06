@@ -73,8 +73,9 @@ export default function WhiteboardDemo() {
       );
       return;
     }
-    // reduce は { state, effects } を返す。このデモはリレー履歴の永続化
-    // （effects の中身）までは扱わないので state だけ取る。
+    // reduce は { state, effects } か、状態を変えない { effects }（ライブ中継）を
+    // 返す。このデモは中継も履歴の永続化も扱わないので、state があるときだけ進める。
+    if (!('state' in result)) return;
     const next = result.state;
     const delay = wb.timerDelay(next);
     setState(next);
@@ -95,7 +96,7 @@ export default function WhiteboardDemo() {
     if (delay === null) return;
     const id = setTimeout(() => {
       const fired = wb.onTimer(state);
-      if (!fired) return;
+      if (!fired || !('state' in fired)) return;
       const next = fired.state;
       setState(next);
       setTrace((t) =>

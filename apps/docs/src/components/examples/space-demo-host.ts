@@ -202,8 +202,14 @@ export function createDemoHost() {
     if (result === null) {
       return { deliveries: [], steps: [{ call, ret: 'null — 無効か no-op。捨てる', noop: true }] };
     }
-    // reduce は { state, effects } を返す。このデモはリレー履歴の永続化
-    // （effects の中身）までは扱わないので state だけ取る。
+    // reduce は { state, effects } か、状態を変えない { effects }（ライブ中継）を
+    // 返す。このデモは中継も履歴の永続化も扱わないので、state があるときだけ進める。
+    if (!('state' in result)) {
+      return {
+        deliveries: [],
+        steps: [{ call, ret: '{ effects } — 状態は変わらない', noop: true }],
+      };
+    }
     const next = result.state;
     whiteboard = next;
     return {
