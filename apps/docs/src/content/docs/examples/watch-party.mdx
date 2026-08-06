@@ -28,11 +28,11 @@ network, a database, or a WebSocket.
   host to go look up a title. This package has no HTTP client and can't do
   that itself.
 - Press **queue-add** for either video. It lands in the queue with
-  `(未解決 — resolve-metadata 待ち)` in place of a title. Press the
-  **ホストがメタデータを解決** ("host resolves metadata") button that appears
-  next to it — that calls `reduce(state, 'resolve-metadata', { uid, kind:
-  'queue', title, durationSec })` directly, simulating the host's side of the
-  round trip, and the title fills in.
+  `(unresolved — awaiting resolve-metadata)` in place of a title. Press the
+  **host resolves metadata** button that appears next to it — that calls
+  `reduce(state, 'resolve-metadata', { uid, kind: 'queue', title,
+  durationSec })` directly, simulating the host's side of the round trip, and
+  the title fills in.
 - Press **play**, then watch the clock. `state` doesn't change again on its
   own — the seconds you see come from `currentPosition(state)` extrapolating
   from the last recorded position and timestamp, redrawn every tick on the

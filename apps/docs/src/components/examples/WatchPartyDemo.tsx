@@ -18,6 +18,7 @@
 // ⚠ setState の updater の中で setTrace を呼ばないこと。updater は React に二度呼ばれうるので
 // （StrictMode の二重呼び出し）、トレースが重複して積まれる。state は素直に読んで使う。
 
+import { Button, HStack, Lozenge, SegmentedControl } from '@insession/design-system';
 import {
   createWatchParty,
   type WatchPartyEffect,
@@ -117,79 +118,71 @@ export default function WatchPartyDemo() {
       <div className="demo-body">
         <div className="demo-pane">
           <p className="demo-label">acting as</p>
-          <div className="demo-controls">
-            {MEMBERS.map((m) => (
-              <button
-                key={m}
-                type="button"
-                className="demo-btn"
-                data-primary={asMember === m ? '' : undefined}
-                onClick={() => setAsMember(m)}
-              >
-                as {m}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            ariaLabel="Acting as"
+            items={MEMBERS.map((m) => ({ value: m, label: `as ${m}` }))}
+            value={asMember}
+            onValueChange={(v) => setAsMember(v as (typeof MEMBERS)[number])}
+          />
 
           <p className="demo-label">Now playing</p>
           <p className="demo-clock" data-phase={state.isPlaying ? 'work' : 'break'}>
             {mmss(position)}
           </p>
           <div className="demo-chips">
-            <span className="demo-chip">
+            <Lozenge tone="neutral">
               videoId: {state.videoId ? `'${state.videoId}'` : 'null'}
-            </span>
-            <span className="demo-chip" data-on={state.isPlaying ? '' : undefined}>
+            </Lozenge>
+            <Lozenge tone={state.isPlaying ? 'success' : 'neutral'} dot={state.isPlaying}>
               {state.isPlaying ? 'playing' : 'stopped'}
-            </span>
+            </Lozenge>
           </div>
-          <div className="demo-controls">
-            <button
-              type="button"
-              className="demo-btn"
+          <HStack gap="sm" wrap>
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() =>
                 dispatch('load-video', { videoId: VIDEOS[0].id, provider: 'youtube', by: asMember })
               }
             >
               load-video
-            </button>
-            <button
-              type="button"
-              className="demo-btn"
-              data-primary=""
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
               disabled={!state.videoId}
               onClick={() => dispatch('play', { by: asMember })}
             >
               play
-            </button>
-            <button
-              type="button"
-              className="demo-btn"
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
               disabled={!state.videoId}
               onClick={() => dispatch('seek', { position: position + 30, by: asMember })}
             >
               seek +30s
-            </button>
-            <button type="button" className="demo-btn" onClick={() => dispatch('pause')}>
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => dispatch('pause')}>
               pause
-            </button>
-            <button
-              type="button"
-              className="demo-btn"
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
               disabled={!state.videoId}
               onClick={() => dispatch('video-ended', { videoId: state.videoId ?? '' })}
             >
               video-ended
-            </button>
-          </div>
+            </Button>
+          </HStack>
 
           <p className="demo-label">Queue (max 1 per member — try adding twice)</p>
-          <div className="demo-controls">
+          <HStack gap="sm" wrap>
             {VIDEOS.map((v) => (
-              <button
+              <Button
                 key={v.id}
-                type="button"
-                className="demo-btn"
+                size="sm"
+                variant="secondary"
                 onClick={() =>
                   dispatch('queue-add', {
                     videoId: v.id,
@@ -201,35 +194,32 @@ export default function WatchPartyDemo() {
                 }
               >
                 queue-add: {v.label}
-              </button>
+              </Button>
             ))}
-            <button
-              type="button"
-              className="demo-btn"
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => dispatch('queue-play-next', { by: asMember })}
             >
               queue-play-next
-            </button>
-          </div>
+            </Button>
+          </HStack>
 
           {state.queue.length === 0 ? (
-            <p className="demo-chip" style={{ marginTop: '0.6rem', display: 'inline-block' }}>
-              queue is empty
-            </p>
+            <div style={{ marginTop: '0.6rem', display: 'inline-block' }}>
+              <Lozenge tone="neutral">queue is empty</Lozenge>
+            </div>
           ) : (
-            <div
-              className="demo-controls"
-              style={{ flexDirection: 'column', alignItems: 'stretch' }}
-            >
+            <div style={{ flexDirection: 'column', alignItems: 'stretch' }}>
               {state.queue.map((q) => (
-                <div key={q.uid} className="demo-controls">
-                  <span className="demo-chip">
-                    {q.uid}: {q.title ?? '(未解決 — resolve-metadata 待ち)'}
-                  </span>
+                <HStack key={q.uid} gap="sm" wrap>
+                  <Lozenge tone="neutral">
+                    {q.uid}: {q.title ?? '(unresolved — awaiting resolve-metadata)'}
+                  </Lozenge>
                   {q.title === null && (
-                    <button
-                      type="button"
-                      className="demo-btn"
+                    <Button
+                      size="sm"
+                      variant="secondary"
                       onClick={() =>
                         dispatch('resolve-metadata', {
                           uid: q.uid,
@@ -239,17 +229,17 @@ export default function WatchPartyDemo() {
                         })
                       }
                     >
-                      ホストがメタデータを解決
-                    </button>
+                      host resolves metadata
+                    </Button>
                   )}
-                  <button
-                    type="button"
-                    className="demo-btn"
+                  <Button
+                    size="sm"
+                    variant="secondary"
                     onClick={() => dispatch('queue-remove', { uid: q.uid })}
                   >
                     queue-remove
-                  </button>
-                </div>
+                  </Button>
+                </HStack>
               ))}
             </div>
           )}

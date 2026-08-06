@@ -6,6 +6,7 @@
 // ものをそのまま右のペインに出す — 音も鳴らないし通知も出ない、ただのデータであることが
 // 一目で分かる。
 
+import { Button } from '@insession/design-system';
 import { createSpaceStore, type SpaceEffect, type SpaceStore } from '@insession/space-state';
 import { useEffect, useRef, useState } from 'react';
 import { pushEntry, type TraceEntry, TraceList } from './Trace.tsx';
@@ -131,24 +132,23 @@ export default function SpaceStateDemo() {
         <div className="demo-pane">
           <p className="demo-label">Feed an inbound message</p>
           <div className="demo-controls">
-            <button
-              type="button"
-              className="demo-btn"
-              data-primary=""
+            <Button
+              variant="primary"
+              size="sm"
               onClick={joinNext}
               disabled={view.members.length >= NAMES.length}
             >
               member-joined
-            </button>
-            <button type="button" className="demo-btn" onClick={sendChat}>
+            </Button>
+            <Button variant="secondary" size="sm" onClick={sendChat}>
               chat
-            </button>
-            <button type="button" className="demo-btn" onClick={sendTyping}>
+            </Button>
+            <Button variant="secondary" size="sm" onClick={sendTyping}>
               typing
-            </button>
-            <button type="button" className="demo-btn" onClick={reset}>
+            </Button>
+            <Button variant="secondary" size="sm" onClick={reset}>
               reset
-            </button>
+            </Button>
           </div>
 
           <p className="demo-label">store.getState()</p>

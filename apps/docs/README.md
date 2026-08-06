@@ -108,15 +108,38 @@ Astro 5（Vite 6）に対して 6 系を入れると、`pnpm dev` でハイド�
 `pnpm add @astrojs/react` を無指定で打つと最新（6 系）が入るので、上げるときは Astro 本体の
 メジャーと合っているかを先に確かめること。
 
-## ⚠ 色は design-system の「値」をコピーしている（依存はしていない）
+## ⚠ このサイトは `@insession/design-system` に依存している（色のコピーはもう持たない）
 
-`src/styles/tokens.css` が `@insession/design-system` のトークンを写経して Starlight の
-テーマ変数へ流している。**DS をパッケージとして依存していない** — このリポジトリは
-「契約とランタイム」だけを置く方針で、サイトの見た目のためだけに SDK → DS の依存を作ると、
-UI プリミティブを直すたびに 3リポジトリ往復が生まれる（ルート `CLAUDE.md` 参照）。
+以前ここは DS のトークンを `src/styles/tokens.css` に**手で写経**していた。デモを DS の
+プリミティブで組むことにした時点（#53）で写経は割に合わなくなり、**npm 公開版への依存**に
+切り替えた。部品（`Button` / `Lozenge` / `MessageItem` …）を使う以上、部品が参照する変数は
+DS のものでなければならず、値だけ写しても同じ色を2箇所で管理する状態が増えるだけになる。
 
-**DS のブランド色を変えてもここは自動追従しない。** 同期するときは design-system の
-`src/styles/theme.css` を正として突き合わせること。
+**依存を持ち込むのは `apps/docs` だけ。`packages/` 配下は従来どおり禁止**（あそこだけが npm に
+出る配布物で、「依存ゼロ」がそのパッケージを選ぶ理由そのもの）。詳しい判断はルート `CLAUDE.md`
+の「例外: `apps/docs` は `@insession/design-system` に依存してよい」を参照。
+
+取り込みで踏むと壊れる点が4つある:
+
+1. **CSS は `astro.config.mjs` の `customCss` からだけ読む。** デモは全て `client:only="react"`
+   なので、コンポーネント内で `import '@insession/design-system/styles.css'` すると
+   ハイドレーション完了までスタイルが当たらず **FOUC** になる。
+2. **`customCss` の順序に意味がある**（DS → `tokens.css` → `examples.css`）。DS の CSS は
+   `@layer` の中、こちらは layer 無しで、**layer 無しは常に layer 付きより強い**。
+3. **`theme.css` / `components.css` は使わない。** あれは Tailwind v4 を持つ消費側専用で、
+   素の `@theme {}` を含む Tailwind ソース。Tailwind を持たないこのサイトが読むべきなのは
+   プリビルド済みの `styles.css` だけ（消費側に Tailwind は要らない）。
+4. **デモのルート要素の `className="demo not-content"` を外さないこと。** `not-content` は
+   Starlight の markdown スタイルを無効化するためのもので、外すと DS の部品が壊れる。
+
+`tokens.css` が今持っているのは「DS の `--color-*` を Starlight の `--sl-color-*` へどう
+割り当てるか」で、**色の値はほぼ持たない**。新しい色が要るなら DS 側に足すこと。
+
+例外は **Starlight の中間グレー4段（`--sl-color-gray-1`/`-2`/`-4`）と `--sl-color-accent-low`**
+の計8個だけ。Starlight は明度の階段と accent の淡い面を要求するが、**DS はどちらも配らない**
+（DS の面は `bg` / `bg-elevated` / `surface` / `surface-hover` という役割名の体系で、汎用の
+グレースケールを持たない）。無いものは参照できないので、ここだけ hex を直接書いていて、
+該当行には `※DS に無い` と印を付けてある。**DS にグレースケールが入ったら `var()` へ寄せること。**
 
 `accent`（塗り専用）と `accent-soft`（文字用）の役割を混ぜないこと。ライトの `accent`
 (`#ff2f02`) は文字として使うとコントラスト基準を満たさない。

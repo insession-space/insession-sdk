@@ -27,8 +27,8 @@ broadcast・再生位置の永続化・動画タイトルの取得）を扱う�
   ほしいという依頼です。このパッケージには HTTP クライアントが無く、自分では
   それができません。
 - どちらかの動画で **queue-add** を押す。タイトルの代わりに
-  `(未解決 — resolve-metadata 待ち)` と表示された状態でキューに積まれます。
-  その横に出る **ホストがメタデータを解決** ボタンを押すと、
+  `(unresolved — awaiting resolve-metadata)` と表示された状態でキューに積まれます。
+  その横に出る `host resolves metadata` ボタンを押すと、
   `reduce(state, 'resolve-metadata', { uid, kind: 'queue', title,
   durationSec })` を直接呼び出して host 側の往復をシミュレートし、タイトルが
   埋まります。

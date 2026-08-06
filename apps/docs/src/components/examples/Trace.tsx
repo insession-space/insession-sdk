@@ -4,6 +4,8 @@
 // no-op（reduce が null を返した / state が同一参照で再レンダリングされなかった）を
 // 隠さず出すのが要点なので、そこだけ色を変えられるようにしてある。
 
+import { EmptyNote } from '@insession/design-system';
+
 export type TraceEntry = {
   /** 表示順を安定させるための単調増加の連番。 */
   id: number;
@@ -27,7 +29,9 @@ export function TraceList({ entries, empty }: { entries: TraceEntry[]; empty: st
   if (entries.length === 0) {
     return (
       <ul className="demo-trace">
-        <li className="empty">{empty}</li>
+        <li className="empty">
+          <EmptyNote variant="compact">{empty}</EmptyNote>
+        </li>
       </ul>
     );
   }

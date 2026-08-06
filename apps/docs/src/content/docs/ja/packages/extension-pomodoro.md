@@ -140,11 +140,38 @@ function saveToDb() {
 | エクスポート | シグネチャ | 意味 |
 | --- | --- | --- |
 | `defaultState()` | `() => PomodoroState` | 宣言も参加者も無い、停止状態の 25分/5分 の新しい state。 |
-| `reduce` | `(state, action, payload?) => PomodoroState \| null` | アクションを1つ適用する。`null` は「無視する」（無効または no-op）。 |
+| `reduce` | `(state, action, payload?) => { state, effects } \| null` | アクションを1つ適用する。`null` は「無視する」（無効または no-op）。 |
 | `timerDelay` | `(state) => number \| null` | 現在のフェーズが終わるまでのミリ秒。動作中でなければ `null`。 |
-| `onTimer` | `(state) => PomodoroState` | `timerDelay` が経過したときに呼ぶ。フェーズを進め、動作を継続する。 |
+| `onTimer` | `(state) => { state, effects }` | `timerDelay` が経過したときに呼ぶ。フェーズを進め、動作を継続する。effects は常に空 — フェーズ遷移は declarations に触れない。 |
 | `restore` | `(raw: unknown) => PomodoroState \| null` | ストレージから読んだ state を正規化する。`null` になるのはオブジェクトでない入力のときだけで、それ以外は常に停止状態で上限が適用される。 |
 | `persistState` | `(state) => PomodoroState` | ストレージへ書く前に `participants` を落とす（セッション限りのため）。 |
+
+### Effects
+
+このパッケージの中で、セッションを跨いで残す価値があるのは declarations だけです。
+メンバーが書いた一行宣言は再入室したときに復元されるべきなので、メンバーと space をキーにした
+あなたのストレージに属します。どのメンバーが何に変えたかは遷移だけが知っていることなので、
+`reduce` がそれを言い、あなたが書き込みを実行します。
+
+| Effect | いつ |
+| --- | --- |
+| `{ type: 'persist-declaration', uid, text }` | サインイン済みのメンバーが宣言した、またはテキストを変更した。 |
+| `{ type: 'delete-declaration', uid }` | サインイン済みのメンバーが宣言を消した。 |
+
+```ts
+const result = reduce(state, 'declare', { by: name, uid, text });
+if (result) {
+  state = result.state;
+  for (const effect of result.effects) {
+    if (effect.type === 'persist-declaration') db.upsert(spaceId, effect.uid, effect.text);
+    else db.delete(spaceId, effect.uid);
+  }
+}
+```
+
+**ゲストは effect を出しません。** ゲストにはストレージをキーにできるアカウントが無いので、
+その宣言は state にしか存在しません — 設計上そうなっています。cheer も同様に出しません
+（保存対象外のため）。
 
 ### 型
 

@@ -319,6 +319,47 @@ pickShuffleIndex: (items) => Math.floor(Math.random() * items.length)
 `WatchPartyAction` ではなく `string` なのは意図的です — ここはアクション名が信用できない入力
 として届くワイヤ境界であり、既知の集合から外れたものはすべて `null` に落ちます。
 
+### キューを永続化するなら、アイテム id は自分で用意する
+
+キューのアイテムは既定でカウンタベースの `uid`（`q1`、`q2`、…）を持ちます。これはキュー全体が
+メモリ上にある間だけ安全です — 保存したキューを再ロードするとカウンタが0から再開するため、
+復元されたアイテムと新規追加のアイテムが id を共有してしまいます。
+
+キューを永続化するなら、保存先の id をそのまま渡してください:
+
+```ts
+const uid = crypto.randomUUID(); // またはデータベースの主キー
+
+watchParty.reduce(state, 'queue-add', { videoId, uid });
+// 以降: reduce(state, 'queue-remove', { uid }) は同じ行を指す
+```
+
+`queue-remove` / `queue-reorder` / `queue-play` が受け取るのも同じ `uid` なので、
+ストレージとこの状態機械が常に同じアイテムを指し続けます。
+
+### メタデータを先に解決するときも、送信順を保つ
+
+ホスト側が `reduce` を呼ぶ前に何か（尺の上限チェックのための duration 取得や、タイトルの
+取得など）を await していると、連続して送られた2つの add が逆順で届くことがあります —
+先に終わった lookup の方が先に `reduce` に到達するためです。すると、実際に送られた順序に対して
+キューの見た目が入れ替わってしまいます。
+
+await する**前**に到着順を同期的に記録し、`addSeq` として渡してください:
+
+```ts
+// await の前に、到着順を同期的に記録する。
+seq += 1;
+const addSeq = seq;
+
+const durationSec = await lookUpDuration(videoId); // 順序が入れ替わりうる
+
+const out = watchParty.reduce(state, 'queue-add', { videoId, durationSec, addSeq });
+```
+
+`reduce` は末尾に追加するのではなく `addSeq` でアイテムを差し込むので、送信順が保たれます。
+`addSeq` を省略すると呼び出し時点の値が割り当てられます — 先に await しないホストであれば
+それで問題ありません。
+
 ## テスト
 
 ```sh

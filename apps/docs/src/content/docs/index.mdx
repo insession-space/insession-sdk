@@ -1,10 +1,10 @@
 ---
 title: '@insession SDK'
-description: Zero-dependency building blocks for realtime shared rooms — a resilient WebSocket transport and a transport-agnostic state store, extracted from InSession.
+description: Building blocks for realtime shared rooms — an extension engine that assembles them into one space, a resilient WebSocket transport, and transport-agnostic state stores, extracted from InSession.
 template: splash
 hero:
   title: Realtime rooms, without the plumbing
-  tagline: Six small, zero-dependency packages pulled out of a production realtime app — a WebSocket transport that survives deploys, and state stores you can test without a server.
+  tagline: Seven small packages pulled out of a production realtime app — an engine that assembles them into one headless space, a WebSocket transport that survives deploys, and state stores you can test without a server.
   actions:
     - text: Get started
       link: /getting-started/
@@ -18,12 +18,30 @@ hero:
 
 <div class="install-line">
   <span class="prompt">$</span>
-  <span>npm install @insession/space-state @insession/ws-resilient-transport</span>
+  <span>npm install @insession/space</span>
 </div>
 
 ## The packages
 
 <div class="pkg-grid">
+  <div class="pkg-card">
+    <h3>@insession/space</h3>
+    <p>
+      The parent package. Builds a headless space out of extensions: the contract
+      (<code>defineSpaceExtension</code>), the aggregate registry, member/presence lifecycle, and
+      an instance (<code>createSpace</code>) that turns accepted actions into effect descriptors.
+      Performs no I/O itself.
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">0 dependencies</span>
+      <span class="pkg-tag">effect descriptors</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/packages/space/">Docs</a>
+      <a href="https://www.npmjs.com/package/@insession/space">npm</a>
+    </div>
+  </div>
+
   <div class="pkg-card">
     <h3>@insession/ws-resilient-transport</h3>
     <p>
@@ -54,6 +72,23 @@ hero:
     <div class="pkg-links">
       <a href="/packages/space-state/">Docs</a>
       <a href="https://www.npmjs.com/package/@insession/space-state">npm</a>
+    </div>
+  </div>
+
+  <div class="pkg-card">
+    <h3>@insession/extension-chat</h3>
+    <p>
+      A server-authoritative chat state machine: message normalization, sticker allowlisting,
+      replies, reactions, and pins. <code>reduce</code> returns state plus effect descriptors —
+      persistence, broadcast, and bot notification are the host's job to execute.
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">0 dependencies</span>
+      <span class="pkg-tag">pure reducer</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/packages/extension-chat/">Docs</a>
+      <a href="https://www.npmjs.com/package/@insession/extension-chat">npm</a>
     </div>
   </div>
 
@@ -109,11 +144,14 @@ hero:
 </div>
 
 <p class="dep-note">
-  No edges between them at all. <code>space-state</code>, <code>ws-resilient-transport</code>,
+  No edges between any of them. <code>space</code>, <code>space-state</code>,
+  <code>ws-resilient-transport</code>, <code>extension-chat</code>,
   <code>extension-pomodoro</code>, <code>extension-whiteboard</code>, and
-  <code>extension-watch-party</code> are each independent — carrying bytes and holding state are
-  kept apart on purpose, so you can adopt any one alone. Using React? There is no binding package
-  to install: <a href="/examples/react-binding/">one line of your own</a> is the whole hook.
+  <code>extension-watch-party</code> are each independent — carrying bytes, holding state, and
+  assembling extensions are kept apart on purpose, so you can adopt any one alone. Even
+  <code>space</code>, the package that ties the state machines together, does not import any of
+  them: it only describes the shape (<code>defaultState</code> / <code>reduce</code> / …) they
+  already have. Using React? There is no binding package to install: <a href="/examples/react-binding/">one line of your own</a> is the whole hook.
 </p>
 
 ## Why these

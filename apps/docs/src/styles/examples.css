@@ -73,73 +73,11 @@
   gap: 0.5rem;
 }
 
-.demo-btn {
-  font: inherit;
-  font-family: var(--__sl-font-mono, ui-monospace, monospace);
-  font-size: 0.87rem;
-  color: var(--ds-text);
-  background: var(--ds-surface);
-  border: 1px solid var(--ds-border-strong);
-  border-radius: 0.5rem;
-  padding: 0.42rem 0.8rem;
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
-}
-
-.demo-btn:hover:not(:disabled) {
-  background: var(--ds-surface-hover);
-  border-color: var(--ds-accent);
-}
-
-.demo-btn:focus-visible {
-  outline: 2px solid var(--ds-accent);
-  outline-offset: 2px;
-}
-
-/* primary は accent の「塗り」。文字用の accent-soft と役割を混ぜない（tokens.css 冒頭参照）。 */
-.demo-btn[data-primary] {
-  background: var(--ds-accent);
-  border-color: var(--ds-accent);
-  color: var(--ds-on-accent, #fff);
-}
-
-.demo-btn[data-primary]:hover:not(:disabled) {
-  background: color-mix(in srgb, #000 12%, var(--ds-accent));
-  border-color: color-mix(in srgb, #000 12%, var(--ds-accent));
-}
-
-.demo-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.demo-field {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.85rem;
-  font-size: 0.82rem;
-  color: var(--ds-text-dim);
-}
-
-.demo-field input {
-  font: inherit;
-  font-family: var(--__sl-font-mono, ui-monospace, monospace);
-  width: 4.5rem;
-  padding: 0.3rem 0.5rem;
-  color: var(--ds-text);
-  background: var(--ds-surface);
-  border: 1px solid var(--ds-border-strong);
-  border-radius: 0.4rem;
-}
-
-.demo-field input:focus-visible {
-  outline: 2px solid var(--ds-accent);
-  outline-offset: 1px;
-}
+/* ⚠ ボタン・入力欄・チップの CSS はここに戻さないこと。
+ * `.demo-btn` / `.demo-field` / `.demo-chip` は DS の `Button` / `Input` / `Lozenge` に
+ * 置き換えて削除した。このファイルは layer に属さないので **DS の `@layer` より常に強い** —
+ * ここに部品のスタイルを書くと、DS 側を直しても反映されない上書きが静かに残る。
+ * 部品の見た目を変えたくなったら design-system を直すか、props で表現すること。 */
 
 /* ── タイマー ─────────────────────────────────────────── */
 
@@ -162,20 +100,6 @@
   flex-wrap: wrap;
   gap: 0.4rem;
   margin-bottom: 1.1rem;
-}
-
-.demo-chip {
-  font-family: var(--__sl-font-mono, ui-monospace, monospace);
-  font-size: 0.72rem;
-  padding: 0.14rem 0.55rem;
-  border: 1px solid var(--ds-border-strong);
-  border-radius: 999px;
-  color: var(--ds-text-dim);
-}
-
-.demo-chip[data-on] {
-  color: var(--ds-decor-1);
-  border-color: color-mix(in srgb, var(--ds-decor-1) 40%, transparent);
 }
 
 /* ── 状態 / トレース ──────────────────────────────────── */
@@ -368,8 +292,5 @@
   margin-bottom: 1rem;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .demo-btn {
-    transition: none;
-  }
-}
+/* ⚠ prefers-reduced-motion のブロックはここに要らない。ボタンの transition は
+ * `.demo-btn` と一緒に消えていて、DS の `Button` は DS 自身が reduced-motion を見る。 */

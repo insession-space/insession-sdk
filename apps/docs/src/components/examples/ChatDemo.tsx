@@ -17,6 +17,7 @@
 // ⚠ setState の updater の中で setTrace を呼ばないこと。updater は React に二度呼ばれうるので
 // （StrictMode の二重呼び出し）、トレースが重複して積まれる。state は素直に読んで使う。
 
+import { Button, Lozenge, SegmentedControl } from '@insession/design-system';
 import {
   type ChatEffect,
   type ChatPayload,
@@ -250,58 +251,47 @@ export default function ChatDemo() {
         <div className="demo-pane">
           <p className="demo-label">acting as</p>
           <div className="demo-controls">
-            {MEMBERS.map((m) => (
-              <button
-                key={m}
-                type="button"
-                className="demo-btn"
-                data-primary={asMember === m ? '' : undefined}
-                onClick={() => setAsMember(m)}
-              >
-                as {m}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="demo-btn"
-              data-primary={replying ? '' : undefined}
+            <SegmentedControl
+              ariaLabel="acting as"
+              items={MEMBERS.map((m) => ({ value: m, label: m }))}
+              value={asMember}
+              onValueChange={(v) => setAsMember(v as Member)}
+            />
+            <Button
+              variant={replying ? 'primary' : 'secondary'}
+              size="sm"
               disabled={lastId === null}
               onClick={() => setReplying((r) => !r)}
             >
               {replying ? `replying to #${lastId}` : 'reply to last'}
-            </button>
+            </Button>
           </div>
 
           <p className="demo-label">send</p>
           <div className="demo-controls">
-            <button
-              type="button"
-              className="demo-btn"
-              data-primary=""
-              onClick={() => sendText('hello there')}
-            >
+            <Button variant="primary" size="sm" onClick={() => sendText('hello there')}>
               text
-            </button>
-            <button type="button" className="demo-btn" onClick={() => sendText('   ')}>
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => sendText('   ')}>
               whitespace only
-            </button>
-            <button type="button" className="demo-btn" onClick={() => sendSticker(OWN_STICKER, '')}>
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => sendSticker(OWN_STICKER, '')}>
               sticker (own URL)
-            </button>
-            <button
-              type="button"
-              className="demo-btn"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => sendSticker(OTHER_STICKER, 'and a caption')}
             >
               sticker (other URL)
-            </button>
+            </Button>
           </div>
 
           <p className="demo-label">react / pin / typing</p>
           <div className="demo-controls">
-            <button
-              type="button"
-              className="demo-btn"
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={lastId === null}
               onClick={() =>
                 dispatch(
@@ -312,10 +302,10 @@ export default function ChatDemo() {
               }
             >
               react 🔥
-            </button>
-            <button
-              type="button"
-              className="demo-btn"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={lastId === null}
               onClick={() =>
                 dispatch(
@@ -326,10 +316,10 @@ export default function ChatDemo() {
               }
             >
               react "nice!"
-            </button>
-            <button
-              type="button"
-              className="demo-btn"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={lastId === null}
               onClick={() =>
                 dispatch(`reduce(state, 'pin-message', { messageId: ${lastId} })`, 'pin-message', {
@@ -339,10 +329,10 @@ export default function ChatDemo() {
               }
             >
               pin last
-            </button>
-            <button
-              type="button"
-              className="demo-btn"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() =>
                 dispatch("reduce(state, 'pin-message', { messageId: null })", 'pin-message', {
                   messageId: null,
@@ -351,26 +341,26 @@ export default function ChatDemo() {
               }
             >
               unpin
-            </button>
-            <button
-              type="button"
-              className="demo-btn"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() =>
                 dispatch("reduce(state, 'typing', { by })", 'typing', { by: asMember })
               }
             >
               typing
-            </button>
+            </Button>
           </div>
 
           <p className="demo-label">state</p>
           <div className="demo-chips">
-            <span className="demo-chip" data-on={state.pinnedMessage ? '' : undefined}>
+            <Lozenge tone={state.pinnedMessage ? 'success' : 'neutral'} dot={!!state.pinnedMessage}>
               {state.pinnedMessage
                 ? `pinned: #${state.pinnedMessage.id} ${state.pinnedMessage.name}`
                 : 'nothing pinned'}
-            </span>
-            <span className="demo-chip">stored: {db.current.rows.size}</span>
+            </Lozenge>
+            <Lozenge tone="neutral">stored: {db.current.rows.size}</Lozenge>
           </div>
 
           <p className="demo-label">what each member received</p>
