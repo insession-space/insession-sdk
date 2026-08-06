@@ -109,6 +109,15 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
+  packages/space-extension:
+    devDependencies:
+      tsup:
+        specifier: ^8.3.5
+        version: 8.5.1(postcss@8.5.25)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
   packages/space-state:
     devDependencies:
       tsup:
