@@ -19,6 +19,17 @@ export default defineConfig({
       },
       description:
         'Building blocks for realtime shared rooms: an extension engine that assembles them into one space, a resilient WebSocket transport, and a transport-agnostic state store.',
+      // ⚠ ロゴは**ライト/ダークで別ファイル**。文字色が違うだけの2枚で、片方だけを指定すると
+      // 反対のテーマで文字が地に沈んで読めなくなる（暗い版は #F1EEE6 の白文字）。
+      //
+      // ⚠ `replacesTitle: true` にすると、ヘッダーからテキストの `title` が消えてロゴだけになる。
+      // ただし `title` は**消さずに残すこと** — `<title>` タグ・OGP・検索結果はこの値を使い続けるし、
+      // ロゴ画像の alt にも使われる。
+      logo: {
+        light: './src/assets/logo-sdk-light.png',
+        dark: './src/assets/logo-sdk-dark.png',
+        replacesTitle: true,
+      },
       // ⚠ 英語を root locale に置いている（`/` が英語、`/ja/` が日本語）。
       // 既に https://insession-sdk.pages.dev/ が英語で公開済みなので、ここを ja に倒すと
       // **公開済みの URL が全部ずれる**。英語側の URL は変えないこと。
