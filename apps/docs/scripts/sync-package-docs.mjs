@@ -55,9 +55,40 @@ function parseReadme(markdown) {
   return { title, description, body };
 }
 
+/**
+ * `packages/<name>` がパッケージかどうか（= `package.json` を持つか）。
+ *
+ * ⚠ ディレクトリの存在だけで判断しないこと。**改名やパッケージ削除のあと、共有チェックアウトには
+ * 未追跡の `dist` / `node_modules` だけを残した空ディレクトリが居座る**（git はコミット済みの
+ * ファイルしか動かさない）。それをパッケージとみなすと README を探しに行って ENOENT で落ち、
+ * 「なぜか docs のビルドだけが通らない」形になる — 実際に `plugin-*` → `extension-*` の改名で
+ * 踏んだ。`git pull` しただけの人が全員踏むので、ここで弾く。
+ *
+ * ただし **README が無い「本物のパッケージ」は今までどおり落とす**（下の readFile が投げる）。
+ * README は npm の配布物なので、無いのは静かに飛ばしてよい欠落ではない。
+ */
+async function isPackage(name) {
+  try {
+    await readFile(join(PACKAGES_DIR, name, 'package.json'), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const entries = await readdir(PACKAGES_DIR, { withFileTypes: true });
-const packages = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+const dirs = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+const flags = await Promise.all(dirs.map(isPackage));
+const packages = dirs.filter((_, i) => flags[i]);
+const skipped = dirs.filter((_, i) => !flags[i]);
 if (packages.length === 0) throw new Error(`packages/ にパッケージが見つからない: ${PACKAGES_DIR}`);
+// 黙って飛ばすと「消したはずのページが出ない」ときに理由が分からないので、必ず言う。
+if (skipped.length > 0) {
+  console.warn(
+    `sync-package-docs: package.json を持たないディレクトリを飛ばした: ${skipped.join(', ')}\n` +
+      '  改名・削除の残骸（dist / node_modules だけのディレクトリ）なら消して構わない。',
+  );
+}
 
 // 消えたパッケージのページが残らないよう、毎回まっさらから作る。
 await rm(OUT_DIR, { recursive: true, force: true });
