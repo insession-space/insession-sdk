@@ -34,11 +34,25 @@ function hash(text) {
     .slice(0, 16);
 }
 
+// ⚠ ディレクトリの存在だけでパッケージとみなさないこと。改名・削除のあと、共有チェックアウトには
+// 未追跡の dist / node_modules だけを残した空ディレクトリが居座る（git はコミット済みのファイル
+// しか動かさない）。sync-package-docs.mjs の同名の関数と同じ理由 — 詳細はそちらのコメント参照。
+async function isPackage(name) {
+  try {
+    await readFile(join(PACKAGES_DIR, name, 'package.json'), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const entries = await readdir(PACKAGES_DIR, { withFileTypes: true });
-const packages = entries
+const dirs = entries
   .filter((e) => e.isDirectory())
   .map((e) => e.name)
   .sort();
+const flags = await Promise.all(dirs.map(isPackage));
+const packages = dirs.filter((_, i) => flags[i]);
 
 const current = {};
 for (const name of packages) {

@@ -113,9 +113,26 @@ test('the raw state-machine APIs also satisfy the contract, with no wrapper at a
   ] as SpaceExtension[];
 
   const s = createSpace({ extensions: raw });
-  assert.deepEqual(s.getState().extensions, space().getState().extensions);
+  assert.deepEqual(
+    withoutClocks(s.getState().extensions),
+    withoutClocks(space().getState().extensions),
+  );
   assert.deepEqual(types(s.dispatch('pomodoro', 'start')), ['broadcast', 'schedule-timer']);
 });
+
+/**
+ * Drops the one field that two independently-built spaces are *supposed* to
+ * disagree on: `extension-watch-party`'s `defaultState()` stamps
+ * `lastUpdate: Date.now()`, so comparing two fresh spaces fails whenever the
+ * two constructions straddle a millisecond. Comparing them raw is a flaky test,
+ * not a real assertion — the same trap this repo already hit once in
+ * `extension-watch-party`'s own suite.
+ */
+function withoutClocks(extensions: Record<string, unknown>) {
+  const wp = extensions['watch-party'] as { lastUpdate?: number } | undefined;
+  if (!wp) return extensions;
+  return { ...extensions, 'watch-party': { ...wp, lastUpdate: 0 } };
+}
 
 test('all four coexist in one space, each owning its own namespaced slice', () => {
   const s = space();
