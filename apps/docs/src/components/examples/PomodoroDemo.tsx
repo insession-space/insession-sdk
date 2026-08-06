@@ -9,6 +9,7 @@
 // ⚠ setState の updater の中で setTrace を呼ばないこと。updater は React に二度呼ばれうるので
 // （StrictMode の二重呼び出し）、トレースが重複して積まれる。state は素直に読んで使う。
 
+import { Button, HStack, Input, Lozenge } from '@insession/design-system';
 import {
   defaultState,
   onTimer,
@@ -100,41 +101,47 @@ export default function PomodoroDemo() {
       <div className="demo-body">
         <div className="demo-pane">
           <p className="demo-label">Timer</p>
+          {/* ⚠ DS の `RingTimer` はここでは使わない。あれは `secondsLeft` を **生の秒数のまま**
+              描画する（`Math.round(secondsLeft)` をそのまま出す）ので、25分のフェーズが
+              `25:00` ではなく `1500` と出てしまう。既定の `urgentThreshold` が 10 秒なことからも
+              分かるとおり、短いカウントダウン向けの部品で、分単位のタイマーは想定外。
+              `ariaLabel` を省くと既定の読み上げ文が日本語になる問題もある（このデモは英語ページと
+              共有）。mm:ss の表示はこのページの主題（「実行中のタイマーは秒を持たない」）そのものなので、
+              自前の表示を残す。WatchPartyDemo も同じ理由で `demo-clock` を維持している。 */}
           <p className="demo-clock" data-phase={state.phase}>
             {mmss(secondsLeft(state))}
           </p>
           <div className="demo-chips">
-            <span className="demo-chip">phase: {state.phase}</span>
-            <span className="demo-chip" data-on={state.running ? '' : undefined}>
+            <Lozenge tone="neutral">phase: {state.phase}</Lozenge>
+            <Lozenge tone={state.running ? 'success' : 'neutral'} dot={state.running}>
               {state.running ? 'running' : 'stopped'}
-            </span>
-            <span className="demo-chip">cycles: {state.cycles}</span>
+            </Lozenge>
+            <Lozenge tone="neutral">cycles: {state.cycles}</Lozenge>
           </div>
 
-          <div className="demo-controls">
-            <button
-              type="button"
-              className="demo-btn"
-              data-primary={state.running ? undefined : ''}
+          <HStack gap="sm" wrap>
+            <Button
+              size="sm"
+              variant={state.running ? 'secondary' : 'primary'}
               onClick={() => dispatch('start')}
             >
               start
-            </button>
-            <button type="button" className="demo-btn" onClick={() => dispatch('pause')}>
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => dispatch('pause')}>
               pause
-            </button>
-            <button type="button" className="demo-btn" onClick={() => dispatch('skip')}>
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => dispatch('skip')}>
               skip
-            </button>
-            <button type="button" className="demo-btn" onClick={() => dispatch('reset')}>
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => dispatch('reset')}>
               reset
-            </button>
-          </div>
+            </Button>
+          </HStack>
 
-          <div className="demo-field">
-            <label htmlFor="pomodoro-work">configure — work</label>
-            <input
+          <HStack gap="sm" align="end">
+            <Input
               id="pomodoro-work"
+              label="configure — work"
               type="number"
               min={1}
               max={120}
@@ -142,14 +149,14 @@ export default function PomodoroDemo() {
               onChange={(e) => setWorkMinutes(e.target.value)}
             />
             <span>min</span>
-            <button
-              type="button"
-              className="demo-btn"
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => dispatch('configure', { workMinutes: Number(workMinutes) })}
             >
               send
-            </button>
-          </div>
+            </Button>
+          </HStack>
 
           <p className="demo-label">state</p>
           <pre className="demo-readout">

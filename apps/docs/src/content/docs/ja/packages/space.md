@@ -173,7 +173,7 @@ const result = registry.applyAction(slices, 'counter', 'inc');
 | メンバー | 型 | 必須 | 備考 |
 | --- | --- | --- | --- |
 | `defaultState` | `() => S` | ✅ | 新しいスライス。restore が何も返さないときのフォールバックでもある |
-| `reduce` | `(state, action: string, payload?) => S \| { state: S; effects: E[] } \| null` | ✅ | `null` は無効か no-op の意味で、状態変化も effect もブロードキャストも起きない。どちらの返り値の形でも受け付ける |
+| `reduce` | `(state, action: string, payload?) => S \| { state: S; effects: E[] } \| { effects: E[] } \| null` | ✅ | `null` は無効か no-op の意味で、何も起きない。`{ effects }` だけを返すのは「これを実行してほしいが、何も変わっていない」という意味 — 下記参照 |
 | `timerDelay` | `(state: S) => number \| null` | — | このスライスの次のイベントまでのミリ秒 |
 | `onTimer` | `(state: S) => S \| { state; effects } \| null` | — | そのタイマーが発火したときに呼ばれる |
 | `restore` | `(raw: unknown) => S \| null` | — | ストレージから読んだスライスを正規化する。無ければセッション限りとして扱う |
@@ -231,6 +231,39 @@ const result = registry.applyAction(slices, 'counter', 'inc');
 その値は**新しい状態から導き直されます**。無条件に適用することが、pause・restart・stop を
 またいでタイマーを正しく保つ唯一の方法です。
 
+### 転送だけして保存しない
+
+live な relay（ポインタ移動ごとに1フレーム流れる描画プレビュー）は、他のメンバーへ転送する
+価値はあっても、保存する価値はありません。`state` を含めずに `{ effects }` だけを返します:
+
+```ts
+reduce(state, action, payload) {
+  if (action === 'frame') {
+    return { effects: [{ type: 'broadcast', message: { type: 'frame', payload }, excludeSender: true }] };
+  }
+  ...
+}
+```
+
+何も保存されず、**state のブロードキャストも無く、タイマーも張り直されません** —
+変わっていないスライスから導いたタイマーは既に動いているものなので、毎フレーム張り直すと、
+本来満了するはずのカウントダウンがリセットされ続けてしまいます。
+
+この場合 `applyAction` は**渡したのと同じ state オブジェクト**を返すので、ホストは参照比較で
+書き込みを飛ばせます:
+
+```ts
+const result = registry.applyAction(slices, name, action, payload);
+if (result) {
+  if (result.state !== slices) await db.save(spaceId, registry.persist(result.state));
+  slices = result.state;
+  for (const effect of result.effects) run(effect);
+}
+```
+
+⚠ これは `null` とは違います。`null` はアクションが無効/no-op で**何も起きない**という意味で、
+`{ effects }` は何かは起きるべきだが、それが state には起きないという意味です。
+
 ### 純粋な層
 
 `createExtensionRegistry(extensions, options?)` — `names` / `has` / `get` / `initState` /
@@ -238,7 +271,12 @@ const result = registry.applyAction(slices, 'counter', 'inc');
 
 素の `SpaceMember[]` に対する参加者関数 — `addConnection` / `removeConnection` /
 `setPresence` / `findMember` / `hasConnection` / `isFirstConnectionOfUid` /
-`isLastConnectionOfUid` / `dedupeByUid`。
+`isLastConnectionOfUid`。
+
+`dedupeByUid` は、あなた自身のメンバー行（`<T extends DedupableMember>`）に対して汎用です:
+読むのは `uid` と `presence` だけで、それ以外のフィールドは渡ってきたそのままの形で返します
+（書き換えうる唯一のフィールドである `presence` を除く）。アバターや、自分が描画に使う
+その他のフィールドを持つロビー一覧に対して、その形を `SpaceMember` に押し込むことなく使えます。
 
 ## テスト
 

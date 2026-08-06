@@ -21,14 +21,11 @@
 // ⚠ setState の updater の中で setTrace を呼ばないこと。updater は React に二度呼ばれうるので
 // （StrictMode の二重呼び出し）、トレースが重複して積まれる。state は素直に読んで使う。
 
+import { Button, HStack, Lozenge, SegmentedControl } from '@insession/design-system';
 import type { PomodoroState } from '@insession/extension-pomodoro';
 import type { WhiteboardState } from '@insession/extension-whiteboard';
-import {
-  createSpaceStore,
-  definePluginClient,
-  type SpaceEffect,
-  type SpaceStore,
-} from '@insession/space-state';
+import type { ExtensionClientFacet } from '@insession/space';
+import { createSpaceStore, type SpaceEffect, type SpaceStore } from '@insession/space-state';
 import { useEffect, useRef, useState } from 'react';
 import {
   createDemoHost,
@@ -93,8 +90,10 @@ const t = (key: string) => LABELS[key] ?? `<${key}>`;
 
 type PomodoroLocal = { phase: string; running: boolean };
 
-const pomodoroClient = definePluginClient({
-  id: 'pomodoro',
+// ⚠ id は持たせない。`@insession/space` の `SpaceExtension.client` は id を extension.name から
+// 補うので（`space.clientExtensions()` が `{ id: ext.name, ...client }` を返す）、ここで書くと
+// host 側の名前と二重管理になる。id を持たない `ExtensionClientFacet` がそのための形。
+const pomodoroClient: ExtensionClientFacet = {
   // ⚠ 直前値を記録するだけに徹する。ここで判定して effect を出すと、入室のたびに鳴る。
   initLocal: (appState) => ({
     phase: (appState as PomodoroState | undefined)?.phase ?? 'work',
@@ -122,12 +121,11 @@ const pomodoroClient = definePluginClient({
         : [],
     };
   },
-});
+};
 
 type WhiteboardLocal = { marks: number };
 
-const whiteboardClient = definePluginClient({
-  id: 'whiteboard',
+const whiteboardClient: ExtensionClientFacet = {
   initLocal: (appState) => {
     const s = appState as WhiteboardState | undefined;
     return { marks: (s?.strokes.length ?? 0) + (s?.shapes.length ?? 0) };
@@ -154,7 +152,7 @@ const whiteboardClient = definePluginClient({
     }
     return { local: nextLocal };
   },
-});
+};
 
 // ── プレイヤー面（core の外） ────────────────────────────────────
 // space-state は 'play' も 'queue-update' も知らないので、届いたワイヤメッセージを
@@ -253,8 +251,14 @@ export default function SpaceDemo() {
   // host も store も1回だけ作る（毎レンダリングで作り直すとスペースが消える）。
   const hostRef = useRef<DemoHost | null>(null);
   const storesRef = useRef<Stores | null>(null);
-  if (hostRef.current === null) hostRef.current = createDemoHost();
+  if (hostRef.current === null) {
+    // pomodoro/whiteboard の client 記述子はここ(画面側)で作るが、host に渡して
+    // `createSpace` の extension オブジェクトへ載せてもらう。id は host 側の extension 名
+    // (`space.clientExtensions()` が付与する)がそのまま使われるので、ここでは書かない。
+    hostRef.current = createDemoHost({ pomodoro: pomodoroClient, whiteboard: whiteboardClient });
+  }
   if (storesRef.current === null) {
+    const host = hostRef.current;
     storesRef.current = Object.fromEntries(
       MEMBERS.map((m) => [
         m.name,
@@ -262,8 +266,9 @@ export default function SpaceDemo() {
           selfName: m.name,
           t,
           getPresence: () => 'active',
-          // plugin 記述子を差し込むのはここ1箇所だけ。core は id しか知らない。
-          plugins: [pomodoroClient, whiteboardClient],
+          // 親パッケージ(`@insession/space`)が持つ client 面をそのまま渡す。手書きの配列を
+          // ここへ直接置かない — host の extension 定義との二重管理になる。
+          plugins: host.clientExtensions(),
         }),
       ]),
     ) as Stores;
@@ -334,7 +339,7 @@ export default function SpaceDemo() {
         store.onSend((msg: any) => {
           setTrace((prev) =>
             pushEntry(prev, {
-              call: `[${m.name}] store.send({ type: '${msg.type}' }) → ホストへ`,
+              call: `[${m.name}] store.send({ type: '${msg.type}' }) → to the host`,
             }),
           );
           // ⚠ ここを同期で処理しないこと。ワイヤは非同期で、送信は必ず「送ってから」返る。
@@ -384,8 +389,8 @@ export default function SpaceDemo() {
     for (const m of MEMBERS) stores[m.name].receive(host.spaceStateMessage(m.id));
     setTrace((prev) =>
       pushEntry(prev, {
-        call: 'host: space-state を2人へ配信',
-        ret: 'apps に pomodoro / whiteboard の初期状態が載る',
+        call: 'host: space-state broadcast to both clients',
+        ret: 'apps carries the initial pomodoro / whiteboard state',
       }),
     );
   }, [host, stores]);
@@ -444,20 +449,13 @@ export default function SpaceDemo() {
       </div>
 
       <div className="demo-pane">
-        <p className="demo-label">acting as — 操作すると両方のクライアントへ配信される</p>
-        <div className="demo-controls">
-          {MEMBERS.map((m) => (
-            <button
-              key={m.name}
-              type="button"
-              className="demo-btn"
-              data-primary={acting === m.name ? '' : undefined}
-              onClick={() => setActing(m.name)}
-            >
-              as {m.name}
-            </button>
-          ))}
-        </div>
+        <p className="demo-label">acting as — actions are broadcast to both clients</p>
+        <SegmentedControl
+          ariaLabel="acting as"
+          items={MEMBERS.map((m) => ({ value: m.name, label: `as ${m.name}` }))}
+          value={acting}
+          onValueChange={(v) => setActing(v as MemberName)}
+        />
       </div>
 
       <div className="space-screen">
@@ -490,76 +488,67 @@ export default function SpaceDemo() {
         {/* ── 🧩スイッチャー。タブの切替もサーバーを1周する。 */}
         <div className="space-stage">
           <div className="space-tabs">
-            {STAGES.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className="demo-btn"
-                data-primary={activeStage === s.id ? '' : undefined}
-                onClick={() => store.stage.change(s.id)}
-              >
-                {s.label}
-              </button>
-            ))}
+            <SegmentedControl
+              ariaLabel="stage"
+              items={STAGES.map((s) => ({ value: s.id, label: s.label }))}
+              value={activeStage}
+              onValueChange={(v) => store.stage.change(v as StageId)}
+            />
           </div>
 
           {activeStage === 'pomodoro' && (
             <>
+              {/* ⚠ DS の `RingTimer` は使わない。生の秒数をそのまま描画するので 25 分が
+                  `25:00` ではなく `1500` になる（PomodoroDemo.tsx の同じ箇所に理由の詳細）。 */}
               <p className="demo-clock" data-phase={pomodoro?.phase}>
                 {mmss(pomodoroSecondsLeft(pomodoro))}
               </p>
               <div className="demo-chips">
-                <span className="demo-chip">phase: {pomodoro?.phase ?? '—'}</span>
-                <span className="demo-chip" data-on={pomodoro?.running ? '' : undefined}>
+                <Lozenge tone="neutral">phase: {pomodoro?.phase ?? '—'}</Lozenge>
+                <Lozenge tone={pomodoro?.running ? 'success' : 'neutral'} dot={pomodoro?.running}>
                   {pomodoro?.running ? 'running' : 'stopped'}
-                </span>
-                <span className="demo-chip">cycles: {pomodoro?.cycles ?? 0}</span>
+                </Lozenge>
+                <Lozenge tone="neutral">cycles: {pomodoro?.cycles ?? 0}</Lozenge>
               </div>
-              <div className="demo-controls">
-                <button
-                  type="button"
-                  className="demo-btn"
-                  data-primary={pomodoro?.running ? undefined : ''}
+              <HStack gap="sm" wrap>
+                <Button
+                  size="sm"
+                  variant={pomodoro?.running ? 'secondary' : 'primary'}
                   onClick={() => appAction('pomodoro', 'start')}
                 >
                   start
-                </button>
-                <button
-                  type="button"
-                  className="demo-btn"
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() => appAction('pomodoro', 'pause')}
                 >
                   pause
-                </button>
-                <button
-                  type="button"
-                  className="demo-btn"
-                  onClick={() => appAction('pomodoro', 'skip')}
-                >
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => appAction('pomodoro', 'skip')}>
                   skip
-                </button>
-                <button
-                  type="button"
-                  className="demo-btn"
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() => appAction('pomodoro', 'reset')}
                 >
                   reset
-                </button>
-              </div>
+                </Button>
+              </HStack>
             </>
           )}
 
           {activeStage === 'whiteboard' && (
             <>
               <div className="demo-chips">
-                <span className="demo-chip">strokes: {whiteboard?.strokes.length ?? 0}</span>
-                <span className="demo-chip">shapes: {whiteboard?.shapes.length ?? 0}</span>
+                <Lozenge tone="neutral">strokes: {whiteboard?.strokes.length ?? 0}</Lozenge>
+                <Lozenge tone="neutral">shapes: {whiteboard?.shapes.length ?? 0}</Lozenge>
               </div>
-              <div className="demo-controls">
-                <button
-                  type="button"
-                  className="demo-btn"
-                  data-primary=""
+              <HStack gap="sm" wrap>
+                <Button
+                  size="sm"
+                  variant="primary"
                   onClick={() =>
                     appAction('whiteboard', 'add-stroke', {
                       stroke: {
@@ -579,11 +568,11 @@ export default function SpaceDemo() {
                     })
                   }
                 >
-                  ストロークを足す
-                </button>
-                <button
-                  type="button"
-                  className="demo-btn"
+                  add stroke
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() =>
                     appAction('whiteboard', 'add-shape', {
                       shape: {
@@ -598,21 +587,22 @@ export default function SpaceDemo() {
                     })
                   }
                 >
-                  図形を足す
-                </button>
-                <button
-                  type="button"
-                  className="demo-btn"
+                  add shape
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() => appAction('whiteboard', 'clear')}
                 >
                   clear
-                </button>
-              </div>
+                </Button>
+              </HStack>
               <p className="demo-label">note</p>
               <p className="space-note">
-                投稿画像が自前ストレージのものかを判定する <code>isOwnImageUrl</code> は host が
-                注入する（<code>{OWN_UPLOAD_PREFIX}…</code>）。実際に弾かれる様子は
-                お絵かき伝言ゲームのある <a href="/examples/whiteboard/">whiteboard</a> で動かせる。
+                <code>isOwnImageUrl</code>, the predicate that decides whether an uploaded image is
+                from own storage, is injected by the host (<code>{OWN_UPLOAD_PREFIX}…</code>). See
+                it actually reject one on the <a href="/examples/whiteboard/">whiteboard</a>{' '}
+                example, which has the drawing relay game.
               </p>
             </>
           )}
@@ -623,40 +613,39 @@ export default function SpaceDemo() {
                 {mmss(displayPosition(player))}
               </p>
               <div className="demo-chips">
-                <span className="demo-chip">
+                <Lozenge tone="neutral">
                   videoId: {player.videoId ? `'${player.videoId}'` : 'null'}
-                </span>
-                <span className="demo-chip" data-on={player.isPlaying ? '' : undefined}>
+                </Lozenge>
+                <Lozenge tone={player.isPlaying ? 'success' : 'neutral'} dot={player.isPlaying}>
                   {player.isPlaying ? 'playing' : 'stopped'}
-                </span>
-                <span className="demo-chip">title: {player.title ?? '(未解決)'}</span>
+                </Lozenge>
+                <Lozenge tone="neutral">title: {player.title ?? '(unresolved)'}</Lozenge>
               </div>
-              <div className="demo-controls">
-                <button
-                  type="button"
-                  className="demo-btn"
-                  data-primary=""
+              <HStack gap="sm" wrap>
+                <Button
+                  size="sm"
+                  variant="primary"
                   onClick={() =>
                     send({ type: 'load-video', videoId: VIDEOS[0].id, provider: 'youtube' })
                   }
                 >
                   load-video
-                </button>
-                <button
-                  type="button"
-                  className="demo-btn"
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
                   disabled={!player.videoId}
                   onClick={() =>
                     send({ type: 'seek', position: Math.round(displayPosition(player)) + 30 })
                   }
                 >
                   seek +30s
-                </button>
+                </Button>
                 {VIDEOS.map((v) => (
-                  <button
+                  <Button
                     key={v.id}
-                    type="button"
-                    className="demo-btn"
+                    size="sm"
+                    variant="secondary"
                     onClick={() =>
                       // addedBy は載せない。誰が積んだかはホストが接続から埋める
                       // （クライアントに名乗らせると maxPerUser を回避できてしまう）。
@@ -669,22 +658,22 @@ export default function SpaceDemo() {
                     }
                   >
                     queue-add: {v.label}
-                  </button>
+                  </Button>
                 ))}
-                <button
-                  type="button"
-                  className="demo-btn"
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() => send({ type: 'queue-play-next' })}
                 >
                   queue-play-next
-                </button>
-              </div>
-              <p className="demo-label">queue（このクライアントに届いたぶん）</p>
+                </Button>
+              </HStack>
+              <p className="demo-label">queue (received by this client)</p>
               <p className="demo-readout">
                 {player.queue.length === 0
                   ? '(empty)'
                   : player.queue
-                      .map((q) => `${q.uid}  ${q.title ?? '(未解決)'}  by ${q.addedBy ?? '—'}`)
+                      .map((q) => `${q.uid}  ${q.title ?? '(unresolved)'}  by ${q.addedBy ?? '—'}`)
                       .join('\n')}
               </p>
               {player.notice ? <p className="demo-readout">{player.notice}</p> : null}
@@ -695,15 +684,17 @@ export default function SpaceDemo() {
         {/* ── チャット。plugin ではなく core なので、extension-chat の broadcast が
              そのまま space-state の受信 case に噛み合う。 */}
         <div className="space-chatpane">
-          <p className="demo-label">chat（{acting} の画面）</p>
+          <p className="demo-label">chat ({acting}'s view)</p>
           {state.pinnedMessage ? (
-            <p className="demo-chip" style={{ display: 'inline-block', marginBottom: '0.6rem' }}>
-              pinned: #{state.pinnedMessage.id} {state.pinnedMessage.name}
-            </p>
+            <div style={{ marginBottom: '0.6rem' }}>
+              <Lozenge tone="success" dot>
+                pinned: #{state.pinnedMessage.id} {state.pinnedMessage.name}
+              </Lozenge>
+            </div>
           ) : null}
           <div className="space-log">
             {state.chatLines.length === 0 ? (
-              <p className="demo-readout">(まだ何も無い)</p>
+              <p className="demo-readout">(nothing yet)</p>
             ) : (
               <pre className="demo-readout">
                 {state.chatLines
@@ -727,66 +718,65 @@ export default function SpaceDemo() {
               </pre>
             )}
           </div>
-          <div className="demo-controls">
-            <button
-              type="button"
-              className="demo-btn"
-              data-primary=""
+          <HStack gap="sm" wrap>
+            <Button
+              size="sm"
+              variant="primary"
               onClick={() => store.chat.send(`hello from ${acting}`)}
             >
               send text
-            </button>
+            </Button>
             {/* ⚠ 他所URLのスタンプ（allowlist に落ちる側）はこのページに置かないこと。
                 store.chat.sendSticker() は本文を持たないメッセージを送るので、host が
                 stickerAllowed: false を畳むと reduce は「テキストに落とす」のではなく null を
                 返して丸ごと捨てる（落とせる本文が無いため）。結果、送信者の楽観的ローカル行
                 だけが id 無しで残り、SDK の不具合のように見える。落ちたときにテキストへ
                 フォールバックする挙動は、本文付きで送れる /examples/chat が正しく見せている。 */}
-            <button
-              type="button"
-              className="demo-btn"
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => store.chat.sendSticker(OWN_STICKER)}
             >
-              sticker（自前URL）
-            </button>
-            <button type="button" className="demo-btn" onClick={() => store.chat.typing()}>
+              sticker (own URL)
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => store.chat.typing()}>
               typing
-            </button>
-          </div>
-          <div className="demo-controls" style={{ marginTop: '0.5rem' }}>
-            <button
-              type="button"
-              className="demo-btn"
+            </Button>
+          </HStack>
+          <HStack gap="sm" wrap style={{ marginTop: '0.5rem' }}>
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => {
                 const last = [...state.chatLines].reverse().find((l: any) => l.id);
                 if (last) store.chat.react(last.id, '🔥');
               }}
             >
               react 🔥
-            </button>
-            <button
-              type="button"
-              className="demo-btn"
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => {
                 const last = [...state.chatLines].reverse().find((l: any) => l.id);
                 if (last) store.chat.pin(last.id);
               }}
             >
               pin last
-            </button>
-            <button type="button" className="demo-btn" onClick={() => store.chat.pin(null)}>
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => store.chat.pin(null)}>
               unpin
-            </button>
-          </div>
+            </Button>
+          </HStack>
         </div>
       </div>
 
       {/* ── ホスト。パッケージが返した記述子と、ホストが実際にやったことが並ぶ。 */}
       <div className="demo-pane">
-        <p className="demo-label">host（このページがサーバー役）</p>
+        <p className="demo-label">host (this page plays the server)</p>
         <TraceList
           entries={trace}
-          empty="何か操作すると、reduce の呼び出しと effect がここに出る。"
+          empty="Trigger an action to see reduce calls and effects appear here."
         />
       </div>
     </div>

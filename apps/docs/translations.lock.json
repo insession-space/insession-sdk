@@ -2,10 +2,10 @@
   "//": "apps/docs/scripts/check-translation-sync.mjs が管理する。手で編集しない。日本語訳を英語 README に追随させたら `pnpm --filter @insession/docs run sync:accept` で更新する。",
   "packages": {
     "extension-chat": "641271071ddb9c91",
-    "extension-pomodoro": "fc1e9a464c5895d1",
+    "extension-pomodoro": "8bf46075386a5ebf",
     "extension-watch-party": "16f9a4e0352977fd",
-    "extension-whiteboard": "ad9d9cad7b81db4a",
-    "space": "06f57974cd6c81d6",
+    "extension-whiteboard": "2efccb5b4d1a5968",
+    "space": "bab56fbb38850e78",
     "space-state": "0ab8a2d05cb18cfe",
     "ws-resilient-transport": "57f6d98a9ea79e45"
   }

@@ -24,10 +24,12 @@
   "dependencies": {
     "@astrojs/react": "^4.4.2",
     "@astrojs/starlight": "^0.36.0",
+    "@insession/design-system": "^7.11.3",
     "@insession/extension-chat": "workspace:*",
     "@insession/extension-pomodoro": "workspace:*",
     "@insession/extension-watch-party": "workspace:*",
     "@insession/extension-whiteboard": "workspace:*",
+    "@insession/space": "workspace:*",
     "@insession/space-state": "workspace:*",
     "astro": "^5.14.0",
     "react": "^19.2.8",

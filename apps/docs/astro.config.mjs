@@ -18,7 +18,7 @@ export default defineConfig({
         ja: '@insession SDK',
       },
       description:
-        'Zero-dependency building blocks for realtime shared rooms: a resilient WebSocket transport and a transport-agnostic state store.',
+        'Building blocks for realtime shared rooms: an extension engine that assembles them into one space, a resilient WebSocket transport, and a transport-agnostic state store.',
       // ⚠ 英語を root locale に置いている（`/` が英語、`/ja/` が日本語）。
       // 既に https://insession-sdk.pages.dev/ が英語で公開済みなので、ここを ja に倒すと
       // **公開済みの URL が全部ずれる**。英語側の URL は変えないこと。
@@ -28,9 +28,24 @@ export default defineConfig({
         ja: { label: '日本語', lang: 'ja' },
       },
       social: [{ icon: 'github', label: 'GitHub', href: REPO }],
-      // ⚠ トークンは @insession/design-system の値を**コピーしている**（依存はしていない）。
-      // 理由と同期の手引きは src/styles/tokens.css の先頭コメントを参照。
-      customCss: ['./src/styles/tokens.css', './src/styles/examples.css'],
+      // ⚠ **順序に意味がある。** DS を先頭に置き、後続2枚がそれを上書きできるようにする。
+      //
+      // DS の CSS は全部 `@layer`（theme / base / components / utilities）の中に入るが、
+      // Starlight のスタイルと下の2枚は layer に属さない。**layer 無しは常に layer 付きより強い**ので、
+      // 実際の優先順位は「Starlight と自前 CSS > DS」になる。並べ替えても DS が勝つことはない。
+      //
+      // ⚠ **デモコンポーネントの中で `import '@insession/design-system/styles.css'` しないこと。**
+      // デモは全て `client:only="react"` なので、island の中で読むとハイドレーション完了まで
+      // スタイルが当たらず FOUC になる。ページの CSS として読むここが唯一の正しい入口。
+      //
+      // ⚠ `theme.css` / `components.css` は**使わない**。あれは Tailwind v4 を持つ消費側専用で、
+      // 素の `@theme {}` を含む Tailwind ソースなので、Astro にそのまま食わせても変数が出力されない。
+      // Tailwind を持たないこのサイトが読むべきなのはプリビルド済みの `styles.css` だけ。
+      customCss: [
+        '@insession/design-system/styles.css',
+        './src/styles/tokens.css',
+        './src/styles/examples.css',
+      ],
       editLink: { baseUrl: `${REPO}/edit/main/apps/docs/` },
       sidebar: [
         {
@@ -67,11 +82,23 @@ export default defineConfig({
               translations: { ja: 'スペース全体' },
               slug: 'examples/space',
             },
-            { label: 'pomodoro', slug: 'examples/pomodoro' },
-            { label: 'whiteboard', slug: 'examples/whiteboard' },
-            { label: 'watch-party', slug: 'examples/watch-party' },
-            { label: 'chat', slug: 'examples/chat' },
-            { label: 'space-state', slug: 'examples/space-state' },
+            { label: 'pomodoro', translations: { ja: 'ポモドーロ' }, slug: 'examples/pomodoro' },
+            {
+              label: 'whiteboard',
+              translations: { ja: 'ホワイトボード' },
+              slug: 'examples/whiteboard',
+            },
+            {
+              label: 'watch-party',
+              translations: { ja: 'ウォッチパーティー' },
+              slug: 'examples/watch-party',
+            },
+            { label: 'chat', translations: { ja: 'チャット' }, slug: 'examples/chat' },
+            {
+              label: 'space-state',
+              translations: { ja: '状態ストア' },
+              slug: 'examples/space-state',
+            },
             {
               label: 'React binding',
               translations: { ja: 'React バインディング' },

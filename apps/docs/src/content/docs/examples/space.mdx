@@ -10,37 +10,47 @@ room so you can see the part no single package shows: **where the boundaries
 are**.
 
 Two members share one space. A pomodoro timer, a whiteboard, a watch party and
-a chat log all live in it. The page below plays the **server** — it owns every
-state machine, runs every effect descriptor, and decides who each message goes
-to. The clients are two `createSpaceStore` instances subscribed through
-`useSpaceState`. Nothing leaves the browser tab.
+a chat log all live in it. The page below plays the **server** using
+`@insession/space`'s `createSpace`: it owns every extension's state, turns
+each dispatched action into `SpaceEffect[]`, and the demo's effect loop
+decides who each message goes to. The clients are two `createSpaceStore`
+instances (`@insession/space-state`) subscribed through `useSpaceState`, each
+wired to the same extensions via `space.clientExtensions()`. Nothing leaves
+the browser tab.
 
 <SpaceDemo client:only="react" />
 
 ## The four boundaries this demo draws
 
-**Plugins arrive as `app-state`.** The pomodoro and whiteboard machines run on
-the server; their new state is broadcast as `{ type: 'app-state', appId, state }`
-and the core stores it under `apps[appId]` — that part happens whether or not a
-plugin descriptor exists. Anything *specific* to a plugin (a log line when the
-phase flips, a sound to play) comes from a `definePluginClient` descriptor
-handed to `createSpaceStore`. The core never learns the plugin's name, its
-wording, or its sound; it just calls `onAppState` and passes along whatever
-comes back.
+**Plugins arrive as `app-state`.** The pomodoro and whiteboard state machines
+are registered with `createSpace` as `@insession/space` extensions
+(`defineSpaceExtension`); an accepted action's new state is broadcast as
+`{ type: 'app-state', appId, state }` and `space-state`'s core stores it under
+`apps[appId]` — that part happens whether or not a client-side descriptor
+exists. Anything *specific* to a plugin (a log line when the phase flips, a
+sound to play) comes from a `definePluginClient` descriptor, reached through
+`space.clientExtensions()` and handed to `createSpaceStore`. Neither `space`
+nor `space-state`'s core ever learns the plugin's name, its wording, or its
+sound; they just call `onAppState` and pass along whatever comes back.
 
-**Chat is core, not a plugin.** `@insession/extension-chat` runs on the server and
-its `broadcast` / `send-to-sender` messages land directly on the receive cases
-`@insession/space-state` already has. Press **send text** and watch the trace:
-the sender is excluded from the broadcast and gets a `chat-ack` instead, which
-carries the id their optimistic local line was missing. Two packages, written
-separately, meeting exactly at `clientMsgId`.
+**Chat runs as a `space` extension, but its messages meet `space-state`'s core
+directly, not through `app-state`.** `@insession/extension-chat` is registered
+with `createSpace` like any other extension, but the wire messages its
+`reduce` emits — `chat`, `chat-ack`, `chat-reaction-update`,
+`message-pinned` — are exactly the shapes `@insession/space-state` already has
+receive cases for. Press **send text** and watch the trace: the sender is
+excluded from the broadcast and gets a `chat-ack` instead, which carries the
+id their optimistic local line was missing. Two packages, written separately,
+meeting exactly at `clientMsgId`.
 
-**The player sits outside the core.** `@insession/extension-watch-party`
-broadcasts `play`, `seek` and `queue-update` — and `space-state` has no case for
-any of them, on purpose. The player is a separate channel of the room, so the
-page projects those messages into its own view, exactly as a real player
-component would. A package doesn't have to fit through `app-state` to belong in
-a space.
+**The player sits outside the core.** `@insession/extension-watch-party` is
+also registered with `createSpace`, but the wire messages it emits — `play`,
+`seek` and `queue-update` — have no matching receive case in
+`@insession/space-state`'s core, on purpose. The player is a separate channel
+of the room, so the page projects those messages into its own view, exactly as
+a real player component would. A package doesn't have to fit through
+`app-state`, or through `space-state`'s core, to belong in a space that
+`space` assembles.
 
 **Everything round-trips.** Even the stage tabs. Clicking one calls
 `store.stage.change(...)`, which sends `stage-change` to the server and only
@@ -63,7 +73,7 @@ everyone is looking at without any extra bookkeeping.
 - **Queue two videos as the same member.** The second is refused with
   `maxPerUser: 1`, and the refusal is a `send-to-sender` — the other member sees
   nothing at all.
-- **Queue anything and watch the title.** It lands as `(未解決)` and the package
+- **Queue anything and watch the title.** It lands as `(unresolved)` and the package
   emits a `resolve-metadata` descriptor; the host answers it, and the resolved
   title arrives on the next broadcast. The package never fetches anything
   itself.
@@ -78,5 +88,7 @@ everyone is looking at without any extra bookkeeping.
 
 Only the pieces that need a real space are on this page. The relay drawing game
 lives on [whiteboard](/examples/whiteboard), reconnection behaviour belongs to
-`@insession/ws-resilient-transport`, and each package's full surface is on its
-own example page. The point here is the seams, not the coverage.
+`@insession/ws-resilient-transport`, persistence (`space.snapshot()` /
+`space.hydrate()` / `armTimers()`) isn't wired up since this page never
+restarts, and each package's full surface is on its own example page. The
+point here is the seams, not the coverage.

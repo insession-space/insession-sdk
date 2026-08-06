@@ -12,6 +12,7 @@
 // 親の再レンダリング（トレースの更新）でも子が描き直されて回数が水増しされるうえ、
 // 「数えた結果を親の state に書く → 親が再描画 → 子も再描画」で無限ループになる。
 
+import { Button, Lozenge } from '@insession/design-system';
 import { createSpaceStore, type SpaceStore } from '@insession/space-state';
 import { memo, useRef, useState } from 'react';
 import { pushEntry, type TraceEntry, TraceList } from './Trace.tsx';
@@ -39,9 +40,9 @@ const ChatPanel = memo(function ChatPanel({ store }: { store: SpaceStore }) {
   return (
     <>
       <div className="demo-chips">
-        <span className="demo-chip" data-on="">
+        <Lozenge tone="success" dot>
           {`<ChatPanel /> renders: ${renders.current}`}
-        </span>
+        </Lozenge>
       </div>
       <pre className="demo-readout">
         {lines.length === 0 ? (
@@ -123,19 +124,19 @@ export default function ReactBindingDemo() {
         <div className="demo-pane">
           <p className="demo-label">Feed an inbound message</p>
           <div className="demo-controls">
-            <button type="button" className="demo-btn" data-primary="" onClick={sendChat}>
+            <Button variant="primary" size="sm" onClick={sendChat}>
               chat
-            </button>
-            <button type="button" className="demo-btn" onClick={sendTyping}>
+            </Button>
+            <Button variant="secondary" size="sm" onClick={sendTyping}>
               typing (same person)
-            </button>
-            <button type="button" className="demo-btn" onClick={reset}>
+            </Button>
+            <Button variant="secondary" size="sm" onClick={reset}>
               reset
-            </button>
+            </Button>
           </div>
 
           <div className="demo-chips" style={{ marginTop: '1.1rem' }}>
-            <span className="demo-chip">{`messages received: ${received}`}</span>
+            <Lozenge tone="neutral">{`messages received: ${received}`}</Lozenge>
           </div>
 
           <p className="demo-label">{'<ChatPanel /> output'}</p>

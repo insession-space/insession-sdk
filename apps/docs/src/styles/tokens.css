@@ -1,40 +1,56 @@
-/* @insession/design-system のトークンを Starlight のテーマ変数へ写経したもの。
+/* @insession/design-system のトークンを Starlight のテーマ変数へ橋渡しする。
  *
- * ⚠ **DS をパッケージとして依存していない。値をコピーしている。**
- * このリポジトリは「契約とランタイム」だけを置く方針で、design-system への依存を
- * 持ち込まない（CLAUDE.md の「入れるもの / 入れないもの」）。ドキュメントサイトの
- * 見た目のためだけに SDK → DS の依存を作ると、UI プリミティブを直すたびに
- * design-system → insession-sdk → 消費側 の往復が生まれる。
- * サイトが必要としているのは色の**値**だけなので、それだけを写している。
+ * ⚠ **このサイトは DS をパッケージとして依存している（値のコピーはもう持たない）。**
+ * 以前ここは DS の16色を手で写経していた。デモを DS のプリミティブで組むことにした時点で
+ * 写経は割に合わなくなった —— 部品（Button / Lozenge / MessageItem …）を使う以上、
+ * 部品が参照する変数は DS のものでなければならず、値だけ写しても二重管理が増えるだけになる。
  *
- * ⚠ **DS のブランド色を変えたら、ここは自動では追従しない。** 同期するときは
- * design-system の src/styles/theme.css を正として下の値を突き合わせること。
+ * **依存を持ち込む範囲は apps/docs だけ。** `packages/` 配下は従来どおり DS 依存を禁止する
+ * （CLAUDE.md の「入れるもの / 入れないもの」）。あの規約が守っているのは npm へ出す配布物の
+ * 「依存ゼロ」であって、private で publish しないドキュメントサイトはその対象ではない。
+ * 元の懸念だった「UI プリミティブを直すたびに design-system → insession-sdk → 消費側 の
+ * 往復が生まれる」も、**npm 公開版に対して依存している限り起きない**（DS の作業中に
+ * こちらを直す必要は無く、上げたいときに版を上げるだけ）。
+ *
+ * ⚠ **色の値をこのファイルに書き足さないこと。** 値の正は DS の `--color-*`。
+ * ここが持つのは「DS の変数を Starlight の `--sl-color-*` へどう割り当てるか」だけ。
+ * 新しい色が要るなら DS 側に足す。
  *
  * ⚠ **accent と accent-soft の役割を混ぜないこと（DS の #122）。**
- *   --ds-accent      … 塗り専用（ボタン・バッジ・枠）。基準は 1.4.11 の 3:1
- *   --ds-accent-soft … 文字/アイコン用。基準は 1.4.3 の 4.5:1
+ *   --color-accent      … 塗り専用（ボタン・バッジ・枠）。基準は 1.4.11 の 3:1
+ *   --color-accent-soft … 文字/アイコン用。基準は 1.4.3 の 4.5:1
  * ライトの accent(#ff2f02) は背景の上で 4.5:1 を満たさないので、**文字色に使わない**。
  *
- * ライト/ダークの持ち方も DS に合わせてある: ダークが既定（:root）で、
- * ライトは :root[data-theme='light'] のオーバーレイでだけ効く。
+ * ライト/ダークの切り替えは **DS がそのまま担う**。DS はダークが既定（:root）で
+ * ライトが `:root[data-theme='light']` のオーバーレイという持ち方で、Starlight も同じ
+ * `data-theme` を html に置くので、こちらで色を切り替え直す必要が無い。
+ * 下のライトのブロックが `--sl-color-*` しか持たないのはそのため。
+ *
+ * ⚠ 読み込み順は astro.config.mjs の customCss で決まる（DS → tokens → examples）。
+ * DS の CSS は `@layer` の中、こちらは layer 無しなので、**常にこちらが勝つ**。
  */
 
 :root {
-  /* ── DS トークン（ダーク = 既定） ─────────────────────────── */
-  --ds-bg: #121211;
-  --ds-bg-elevated: #1a1a18;
-  --ds-surface: #201f1d;
-  --ds-surface-hover: #2b2b29;
-  --ds-border: #332f25;
-  --ds-border-strong: #403a2d;
-  --ds-text: #f3f0e7;
-  --ds-text-dim: #a7a395;
-  --ds-text-faint: #969185;
-  --ds-accent: #ff6a47; /* 塗り専用（コーラル） */
-  --ds-accent-soft: #ffb199; /* 文字/アイコン */
-  --ds-accent-2: #618ff1; /* セカンダリ（ブルー） */
-  --ds-decor-1: #31c47e; /* 装飾（グリーン） */
-  --ds-on-accent: #ffffff;
+  /* ── DS トークンの別名 ────────────────────────────────────
+   * 値は持たず DS の `--color-*` を指すだけ。`--ds-*` という名前を残しているのは
+   * examples.css と LP のスタイルが既にこの名前で書かれているためで、
+   * **ここを経由することで「DS のどの色を使っているか」が1箇所に集まる**。
+   * ライト/ダークの出し分けは DS 側の `--color-*` が既に行うので、
+   * var() は使用時に現在のテーマの値へ解決される（下のライトブロックで再定義しない）。 */
+  --ds-bg: var(--color-bg);
+  --ds-bg-elevated: var(--color-bg-elevated);
+  --ds-surface: var(--color-surface);
+  --ds-surface-hover: var(--color-surface-hover);
+  --ds-border: var(--color-border);
+  --ds-border-strong: var(--color-border-strong);
+  --ds-text: var(--color-text);
+  --ds-text-dim: var(--color-text-dim);
+  --ds-text-faint: var(--color-text-faint);
+  --ds-accent: var(--color-accent); /* 塗り専用（コーラル） */
+  --ds-accent-soft: var(--color-accent-soft); /* 文字/アイコン */
+  --ds-accent-2: var(--color-accent-2); /* セカンダリ（ブルー） */
+  --ds-decor-1: var(--color-decor-1); /* 装飾（グリーン） */
+  --ds-on-accent: var(--color-on-accent);
 
   /* ── Starlight のテーマ変数へ写す ────────────────────────── */
   --sl-color-white: var(--ds-text);
@@ -62,21 +78,9 @@
   --sl-color-hairline-shade: var(--ds-surface);
 }
 
+/* ライトで再定義するのは Starlight の変数だけ。`--ds-*` は DS の `--color-*` を
+ * 指しているので、DS 自身の :root[data-theme="light"] が切り替えたぶんが自動で届く。 */
 :root[data-theme="light"] {
-  --ds-bg: #e9e9e6;
-  --ds-bg-elevated: #f4f1e9;
-  --ds-surface: #ffffff;
-  --ds-surface-hover: #f1ede3;
-  --ds-border: #e2ded3;
-  --ds-border-strong: #d6d2c6;
-  --ds-text: #17160f;
-  --ds-text-dim: #5c5b52;
-  --ds-text-faint: #6b685e;
-  --ds-accent: #ff2f02;
-  --ds-accent-soft: #a13619;
-  --ds-accent-2: #1f54c9;
-  --ds-decor-1: #156e43;
-
   --sl-color-white: var(--ds-text);
   --sl-color-gray-1: #2b2a22;
   --sl-color-gray-2: #45443a;

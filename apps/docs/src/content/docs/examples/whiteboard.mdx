@@ -23,16 +23,16 @@ package never sees it as anything but "the predicate said yes."
 
 ## What to try
 
-- In **draw** phase, submit a drawing with **"自前URL" (own URL)** — it's
-  accepted, because `isOwnImageUrl` recognizes the prefix. Then submit with
-  **"他所URL" (someone else's URL)** — `reduce` returns `null`, dropping the
-  action entirely rather than accepting an arbitrary external image.
-- In **free** mode, press **clear** with strokes and shapes on the board.
-  Both counts go to zero together — a "clear the board" that only cleared
-  strokes would leave shapes behind, which would violate what "clear" means.
-- Press **消す (erase)** with no strokes on the board. It returns `null` —
-  there's nothing to remove, so it's a no-op rather than a broadcast-worthy
-  change.
+- In **draw** phase, submit a drawing with **own URL** — it's accepted,
+  because `isOwnImageUrl` recognizes the prefix. Then submit with
+  **other URL** — `reduce` returns `null`, dropping the action entirely
+  rather than accepting an arbitrary external image.
+- In **free** mode, press **add stroke** and **add shape** a few times, then
+  press **clear** with strokes and shapes on the board. Both counts go to
+  zero together — a "clear the board" that only cleared strokes would leave
+  shapes behind, which would violate what "clear" means.
+- Press **erase** with no strokes on the board. It returns `null` — there's
+  nothing to remove, so it's a no-op rather than a broadcast-worthy change.
 - Switch between **free** and **relay**. Each switch also calls `reduce`
   with `set-mode`, and it's always `null`: tab switching is a client-side
   display concern now, and accepting `set-mode` server-side would let anyone

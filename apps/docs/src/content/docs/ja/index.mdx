@@ -1,10 +1,10 @@
 ---
 title: '@insession SDK'
-description: リアルタイムな共有ルームを作るための、依存ゼロの部品。デプロイを生き延びる WebSocket トランスポートと、transport 非依存の状態 store。
+description: リアルタイムな共有ルームを作るための部品——それらを1つの space に組み立てる extension エンジン、デプロイを生き延びる WebSocket トランスポート、transport 非依存の状態 store。InSession から切り出しました。
 template: splash
 hero:
   title: 配管を書かずに、リアルタイムな部屋を作る
-  tagline: 本番稼働中のリアルタイムアプリから切り出した、小さな依存ゼロのパッケージ4つ。デプロイを生き延びる WebSocket トランスポートと、サーバーなしでテストできる状態 store。
+  tagline: 本番稼働中のリアルタイムアプリから切り出した、小さなパッケージ7つ。extension を1つのヘッドレスな space に組み立てるエンジン、デプロイを生き延びる WebSocket トランスポート、サーバーなしでテストできる状態 store。
   actions:
     - text: はじめかた
       link: /ja/getting-started/
@@ -18,12 +18,30 @@ hero:
 
 <div class="install-line">
   <span class="prompt">$</span>
-  <span>npm install @insession/space-state @insession/ws-resilient-transport</span>
+  <span>npm install @insession/space</span>
 </div>
 
 ## パッケージ
 
 <div class="pkg-grid">
+  <div class="pkg-card">
+    <h3>@insession/space</h3>
+    <p>
+      ヘッドレスなリアルタイム space を、extension の集合として組み立てる親パッケージ。自分の
+      WebSocket サーバーとストレージを持ち込めば、誰が接続しているか・どの extension がどの
+      state のスライスを持つか・action がどの reducer に届くか・タイマーの再起動タイミングを
+      このパッケージが引き受けます。すべての遷移は I/O を行わず、effect 記述子を返すだけです。
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">依存ゼロ</span>
+      <span class="pkg-tag">extension エンジン</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/ja/packages/space/">ドキュメント</a>
+      <a href="https://www.npmjs.com/package/@insession/space">npm</a>
+    </div>
+  </div>
+
   <div class="pkg-card">
     <h3>@insession/ws-resilient-transport</h3>
     <p>
@@ -72,13 +90,68 @@ hero:
       <a href="https://www.npmjs.com/package/@insession/extension-pomodoro">npm</a>
     </div>
   </div>
+
+  <div class="pkg-card">
+    <h3>@insession/extension-whiteboard</h3>
+    <p>
+      サーバーを正とするホワイトボードの状態機械。共有の自由描画 strokes/shapes に加えて、
+      独自のフェーズタイミングを持つ「お絵かき伝言ゲーム」の relay をオプションで同居させたもの。
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">依存ゼロ</span>
+      <span class="pkg-tag">純粋 reducer</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/ja/packages/extension-whiteboard/">ドキュメント</a>
+      <a href="https://www.npmjs.com/package/@insession/extension-whiteboard">npm</a>
+    </div>
+  </div>
+
+  <div class="pkg-card">
+    <h3>@insession/extension-watch-party</h3>
+    <p>
+      サーバーを正とする Watch Party の状態機械。キューと履歴を伴う動画/音声の同期再生。
+      <code>reduce</code> は I/O を行わず effect 記述子を返すだけなので、broadcast /
+      永続化 / タイトル解決はホスト側が自分で配線します。
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">依存ゼロ</span>
+      <span class="pkg-tag">純粋 reducer</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/ja/packages/extension-watch-party/">ドキュメント</a>
+      <a href="https://www.npmjs.com/package/@insession/extension-watch-party">npm</a>
+    </div>
+  </div>
+
+  <div class="pkg-card">
+    <h3>@insession/extension-chat</h3>
+    <p>
+      サーバーを正とするチャットの状態機械。メッセージの正規化・スタンプ検証・返信・メッセージ
+      ごとの絵文字リアクション・入力中インジケーター・ピン留めを1つの純粋な <code>reduce</code>
+      に畳んだもの。
+    </p>
+    <div class="pkg-tags">
+      <span class="pkg-tag" data-kind="zero-deps">依存ゼロ</span>
+      <span class="pkg-tag">純粋 reducer</span>
+    </div>
+    <div class="pkg-links">
+      <a href="/ja/packages/extension-chat/">ドキュメント</a>
+      <a href="https://www.npmjs.com/package/@insession/extension-chat">npm</a>
+    </div>
+  </div>
 </div>
 
 <p class="dep-note">
-  パッケージ間の依存は1本もありません。<code>space-state</code> /
-  <code>ws-resilient-transport</code> / <code>extension-pomodoro</code> はそれぞれ独立しています —
-  バイトを運ぶことと状態を持つことを意図的に切り離してあるので、どれか1つだけを採用できます。
-  React で使う場合も、入れるバインディングのパッケージはありません。
+  パッケージ間の依存は1本もありません。<code>space</code> / <code>space-state</code> /
+  <code>ws-resilient-transport</code> / <code>extension-pomodoro</code> /
+  <code>extension-whiteboard</code> / <code>extension-watch-party</code> /
+  <code>extension-chat</code> はそれぞれ独立しています — <code>space</code> は既存4つの状態機械が
+  もともと満たしている形（<code>defaultState</code> / <code>reduce</code> / <code>restore</code> /
+  <code>persistState</code> 等）を契約として言語化しただけなので、状態機械の側から
+  <code>space</code> を import する必要も、<code>space</code> の側から特定の状態機械を import する
+  必要もありません。バイトを運ぶことと状態を持つことを意図的に切り離してあるので、どれか1つだけを
+  採用できます。React で使う場合も、入れるバインディングのパッケージはありません。
   <a href="/ja/examples/react-binding/">自分で書く1行</a>がフックの全部です。
 </p>
 

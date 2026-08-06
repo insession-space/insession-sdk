@@ -130,7 +130,7 @@ npm はアカウントの 2FA か bypass 2FA 付きトークンを要求する�
 | 入れる | 入れない |
 | --- | --- |
 | 汎用のランタイム（`ws-resilient-transport`。InSession 固有の情報を1つも含まない） | **plugin**（`plugin-pomodoro` 等）。UI・i18n キー・プロダクト判断を抱えるので `insession-app` 側に置く |
-| 依存ゼロの状態機械（`space-state`） | **UI を持つもの全般**。`@insession/design-system` への依存をこのリポジトリに持ち込まない。**フレームワーク固有の薄いバインディングも同じ**（React 用の1行フックを別パッケージで配っていたが #42 で廃止した） |
+| 依存ゼロの状態機械（`space-state`） | **UI を持つもの全般**。`@insession/design-system` への依存を **`packages/` 配下に**持ち込まない（`apps/docs` は例外。下記参照）。**フレームワーク固有の薄いバインディングも同じ**（React 用の1行フックを別パッケージで配っていたが #42 で廃止した） |
 | **ただし plugin の server 面**（UI・i18n・design-system への依存を持たず、外部 import がゼロの純粋な状態機械）は入れてよい（`extension-pomodoro` / `extension-whiteboard`） | plugin の **client 面**（UI コンポーネント。`pomodoro-kit` 等） |
 
 **「`@insession/*` スコープだから」という理由だけでここへ移さないこと。** スコープは「OSS 候補である」という表明でしかなく、置き場所の判断とは別。plugin をここへ入れると次の3つが同時に起きる:
@@ -140,6 +140,18 @@ npm はアカウントの 2FA か bypass 2FA 付きトークンを要求する�
 3. **リリース周期が混ざる** — 契約層は安定していてほしいが、plugin はプロダクトと一緒に動く。同居させると採番が互いに引きずられる
 
 外部に「space を作れる SDK」を出すのに plugin は必須ではない。`definePluginClient` の**契約さえ配れば、消費者は自分の plugin を書ける**。plugin 自体を配りたくなったら、このリポジトリに足すのではなく別リポジトリを立てて判断する。
+
+### 例外: `apps/docs` は `@insession/design-system` に依存してよい
+
+**この禁止が守っているのは「npm へ出す配布物の依存ゼロ」であって、リポジトリの中に DS の文字列が一切現れないことではない。** `apps/docs` は `private: true` で publish されず、Changesets の採番対象でもない。したがって上の禁止の対象外で、実際に依存している（#53）。
+
+判断が変わった経緯: docs サイトはもともと DS の色を **`tokens.css` に手で写経**していた（依存を作らずに見た目だけ揃えるため）。デモを DS のプリミティブで組むと決めた時点でこれは割に合わなくなった —— 部品（`Button` / `Lozenge` / `MessageItem` …）を使う以上、部品が参照する変数は DS のものでなければならず、値だけ写しても**同じ色を2箇所で管理する**状態が増えるだけになる。
+
+当初の懸念だった「UI プリミティブを直すたびに design-system → insession-sdk → insession-app の3リポジトリ往復になる」は、**npm 公開版に対して依存している限り起きない**。DS を直している最中にこちらへ手を入れる必要は無く、上げたいときに版を上げるだけで済む。
+
+**ただし `packages/` 配下は従来どおり禁止。** そこだけが npm に出る配布物で、「依存ゼロ」がそのパッケージを選ぶ理由そのものだから。`apps/` と `packages/` で規律が違うのは統一し忘れではなく、**守っている対象が違う**。
+
+取り込み方の詳細（`customCss` の順序、`@layer` の強さ、`client:only` と FOUC、`theme.css` を使ってはいけない理由）は `apps/docs/src/styles/tokens.css` の先頭コメントと `apps/docs/astro.config.mjs` の `customCss` のコメントが正。
 
 ### 例外: plugin の server 面（純粋な状態機械）は入れてよい
 

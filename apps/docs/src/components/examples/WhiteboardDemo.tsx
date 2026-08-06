@@ -13,6 +13,7 @@
 // ⚠ setState の updater の中で setTrace を呼ばないこと。updater は React に二度呼ばれうるので
 // （StrictMode の二重呼び出し）、トレースが重複して積まれる。state は素直に読んで使う。
 
+import { Button, HStack, Lozenge, SegmentedControl } from '@insession/design-system';
 import {
   createWhiteboardState,
   type WhiteboardState,
@@ -124,35 +125,31 @@ export default function WhiteboardDemo() {
       <div className="demo-body">
         <div className="demo-pane">
           <p className="demo-label">Mode</p>
-          <div className="demo-controls">
-            {(['free', 'relay'] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                className="demo-btn"
-                data-primary={view === v ? '' : undefined}
-                onClick={() => {
-                  setView(v);
-                  // set-mode は README のとおり常に no-op（互換のためだけに受け付ける）。タブの
-                  // 切り替え自体はローカルの UI state で行い、これは no-op を毎回見せるための呼び出し。
-                  dispatch('set-mode');
-                }}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            ariaLabel="Mode"
+            items={[
+              { value: 'free', label: 'free' },
+              { value: 'relay', label: 'relay' },
+            ]}
+            value={view}
+            onValueChange={(v) => {
+              setView(v as 'free' | 'relay');
+              // set-mode は README のとおり常に no-op（互換のためだけに受け付ける）。タブの
+              // 切り替え自体はローカルの UI state で行い、これは no-op を毎回見せるための呼び出し。
+              dispatch('set-mode');
+            }}
+          />
 
           {view === 'free' ? (
             <>
               <div className="demo-chips" style={{ marginTop: '0.9rem' }}>
-                <span className="demo-chip">strokes: {state.strokes.length}</span>
-                <span className="demo-chip">shapes: {state.shapes.length}</span>
+                <Lozenge tone="neutral">strokes: {state.strokes.length}</Lozenge>
+                <Lozenge tone="neutral">shapes: {state.shapes.length}</Lozenge>
               </div>
-              <div className="demo-controls">
-                <button
-                  type="button"
-                  className="demo-btn"
+              <HStack gap="sm" wrap>
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() =>
                     dispatch('add-stroke', {
                       stroke: {
@@ -172,11 +169,11 @@ export default function WhiteboardDemo() {
                     })
                   }
                 >
-                  ストロークを足す
-                </button>
-                <button
-                  type="button"
-                  className="demo-btn"
+                  add stroke
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() =>
                     dispatch('add-shape', {
                       shape: {
@@ -191,94 +188,86 @@ export default function WhiteboardDemo() {
                     })
                   }
                 >
-                  図形を足す
-                </button>
-                <button
-                  type="button"
-                  className="demo-btn"
+                  add shape
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() => dispatch('erase', { ids: state.strokes.map((s) => s.id) })}
                 >
-                  消す (erase)
-                </button>
-                <button type="button" className="demo-btn" onClick={() => dispatch('clear')}>
+                  erase
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => dispatch('clear')}>
                   clear
-                </button>
-              </div>
+                </Button>
+              </HStack>
             </>
           ) : (
             <>
               <div className="demo-chips" style={{ marginTop: '0.9rem' }}>
-                <span className="demo-chip">phase: {game?.phase ?? 'no game'}</span>
+                <Lozenge tone="neutral">phase: {game?.phase ?? 'no game'}</Lozenge>
                 {game && game.phase !== 'lobby' && game.phase !== 'album' ? (
-                  <span className="demo-chip" data-on="">
+                  <Lozenge tone="success" dot>
                     {remaining ?? 0}s left
-                  </span>
+                  </Lozenge>
                 ) : null}
-                <span className="demo-chip">
+                <Lozenge tone="neutral">
                   timerDelay: {(() => {
                     const d = wb.timerDelay(state);
                     return d === null ? 'null' : `${Math.round(d / 1000)}s`;
                   })()}
-                </span>
+                </Lozenge>
               </div>
 
               {(!game || game.phase === 'lobby') && (
-                <div className="demo-controls">
+                <HStack gap="sm" wrap>
                   {PLAYERS.map((p) => (
-                    <button
+                    <Button
                       key={p}
-                      type="button"
-                      className="demo-btn"
+                      size="sm"
+                      variant="secondary"
                       disabled={!!game?.players.includes(p)}
                       onClick={() => dispatch('join-game', { by: p })}
                     >
                       join: {p}
-                    </button>
+                    </Button>
                   ))}
-                  <button
-                    type="button"
-                    className="demo-btn"
-                    data-primary=""
+                  <Button
+                    size="sm"
+                    variant="primary"
                     disabled={!game || game.players.length < 2}
                     onClick={() => dispatch('start-game')}
                   >
                     start-game
-                  </button>
-                </div>
+                  </Button>
+                </HStack>
               )}
 
               {game && game.phase !== 'lobby' && game.phase !== 'album' && (
                 <>
-                  <div className="demo-controls">
-                    {game.players.map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        className="demo-btn"
-                        data-primary={asPlayer === p ? '' : undefined}
-                        onClick={() => setAsPlayer(p as (typeof PLAYERS)[number])}
-                      >
-                        as {p}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="demo-controls">
+                  <SegmentedControl
+                    ariaLabel="Acting as"
+                    items={game.players.map((p) => ({ value: p, label: `as ${p}` }))}
+                    value={asPlayer}
+                    onValueChange={(v) => setAsPlayer(v as (typeof PLAYERS)[number])}
+                  />
+                  <HStack gap="sm" wrap>
                     {game.phase === 'prompt' && (
-                      <button
-                        type="button"
-                        className="demo-btn"
+                      <Button
+                        size="sm"
+                        variant="secondary"
                         onClick={() =>
                           dispatch('submit-prompt', { by: asPlayer, text: 'a cat riding a bike' })
                         }
                       >
-                        お題を出す
-                      </button>
+                        submit prompt
+                      </Button>
                     )}
                     {game.phase === 'draw' && (
                       <>
-                        <button
-                          type="button"
-                          className="demo-btn"
+                        <Button
+                          size="sm"
+                          variant="secondary"
                           onClick={() =>
                             dispatch('submit-drawing', {
                               by: asPlayer,
@@ -286,38 +275,38 @@ export default function WhiteboardDemo() {
                             })
                           }
                         >
-                          絵を出す（自前URL）
-                        </button>
-                        <button
-                          type="button"
-                          className="demo-btn"
+                          own URL
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
                           onClick={() =>
                             dispatch('submit-drawing', { by: asPlayer, imageUrl: OTHER_URL })
                           }
                         >
-                          絵を出す（他所URL）
-                        </button>
+                          other URL
+                        </Button>
                       </>
                     )}
                     {game.phase === 'guess' && (
-                      <button
-                        type="button"
-                        className="demo-btn"
+                      <Button
+                        size="sm"
+                        variant="secondary"
                         onClick={() => dispatch('submit-guess', { by: asPlayer, text: 'a cat' })}
                       >
-                        答える
-                      </button>
+                        submit guess
+                      </Button>
                     )}
-                  </div>
+                  </HStack>
                 </>
               )}
 
               {game?.phase === 'album' && (
-                <div className="demo-controls">
-                  <button type="button" className="demo-btn" onClick={() => dispatch('reset-game')}>
+                <HStack gap="sm" wrap>
+                  <Button size="sm" variant="secondary" onClick={() => dispatch('reset-game')}>
                     reset-game
-                  </button>
-                </div>
+                  </Button>
+                </HStack>
               )}
             </>
           )}

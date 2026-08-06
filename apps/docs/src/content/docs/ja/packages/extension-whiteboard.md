@@ -19,9 +19,10 @@ strokes の配列に上限が無ければ際限なく増え続け、悪意ある
 
 このパッケージは、その配管を全部取り除いた状態機械そのものです:
 
-- **`reduce` は純関数。** `(state, action, payload) => nextState | null`。I/O をせず、内部でタイマーを
-  張ることもありません。`null` は「このアクションを無視する」という意味です（例: 上限を超えた
-  shape の追加、空の `clear`）。
+- **`reduce` は純関数。** `(state, action, payload) => { state, effects } | null`。I/O をせず、内部で
+  タイマーを張ることもありません。`null` は「このアクションを無視する」という意味です（例: 上限を
+  超えた shape の追加、空の `clear`）。`effects` はあなたが実行すべき書き込みを記述します
+  （下記参照）。
 - **確定した strokes/shapes だけを扱う。** 描画中（ライブのカーソルプレビュー）は意図的に対象外
   です — それは自分で作る、低遅延で検証しない別チャネルの役割です。このモジュールが気にするのは、
   描き終わった strokes/shapes だけです。
@@ -179,10 +180,33 @@ transport でそのまま検証も保存もせずに配信し、ポインタが�
 | --- | --- | --- |
 | `createWhiteboardState` | `(options: { isOwnImageUrl: (url: string) => boolean }) => WhiteboardStateApi` | API を組み立てる。`isOwnImageUrl` が無い、または関数でなければ例外を投げる。 |
 | `defaultState()` | `() => WhiteboardState` | 空の free モードで、relay ゲームも無い state。トップレベルの export としても利用可能（上記参照）。 |
-| `.reduce` | `(state, action, payload?) => WhiteboardState \| null` | アクションを1つ適用する。`null` は「無視する」（無効または no-op）。 |
+| `.reduce` | `(state, action, payload?) => { state, effects } \| null` | アクションを1つ適用する。`null` は「無視する」（無効または no-op）。 |
 | `.timerDelay` | `(state) => number \| null` | 現在の relay フェーズが（猶予期間込みで）終わるまでのミリ秒。relay ゲームが動作中でなければ `null`。 |
-| `.onTimer` | `(state) => WhiteboardState \| null` | `timerDelay` が経過したときに呼ぶ。未提出のプレイヤーにプレースホルダーを埋めてからラウンドを進める。ゲームが無ければ `null`。 |
+| `.onTimer` | `(state) => { state, effects } \| null` | `timerDelay` が経過したときに呼ぶ。未提出のプレイヤーにプレースホルダーを埋めてからラウンドを進める。ゲームが無ければ `null`。 |
 | `.restore` | `(raw: unknown) => WhiteboardState \| null` | ストレージから読んだ state を正規化する。`null` になるのはオブジェクトでない入力のときだけで、それ以外は strokes/shapes がフィルタ・上限適用され、`mode` は常に `'free'`、`game` は常に `null` になる。 |
+
+### Effects
+
+このパッケージの中で、セッションを跨いで残す価値があるのは完成した relay ゲームだけです。
+album（誰が何をどの順で描いたか）こそが報酬であり、全員が退室すると消えてしまいます。
+
+| Effect | いつ |
+| --- | --- |
+| `{ type: 'persist-relay-history', players, chains }` | `reduce` または `onTimer` のどちらかから relay が album に到達したとき。 |
+
+album への遷移の辺で**ゲーム1回につきちょうど1回**だけ発火します。再戦（`reset-game` で
+ロビーに戻ってから再び遊ぶ）は自分自身の effect を1回出します。free-draw の編集は effect を
+出しません。
+
+```ts
+const result = board.reduce(state, action, payload);
+if (result) {
+  state = result.state;
+  for (const effect of result.effects) {
+    db.insertRelayHistory(spaceId, { finishedAt: Date.now(), ...effect });
+  }
+}
+```
 
 ### 型
 
