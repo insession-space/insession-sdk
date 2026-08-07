@@ -61,9 +61,6 @@ Published as a built package with both ESM (`dist/index.js`) and CommonJS
 (`dist/index.cjs`) entry points plus `dist/index.d.ts` types, no runtime
 dependencies.
 
-> Renamed from `@insession/chat-state` at 0.2.0. The old name is deprecated on
-> npm; the API is unchanged apart from the addition of `chatExtension` below.
-
 ## Drop it into a space
 
 If you are assembling a space with

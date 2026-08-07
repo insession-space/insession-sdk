@@ -4,96 +4,55 @@ description: What the @insession packages are, how they fit together, and which 
 ---
 
 The `@insession` SDK is a set of small packages pulled out of a production
-realtime app. They are independent enough that you can adopt one and ignore the
-rest.
+realtime app. There are no import edges between any of them, so you can adopt
+one and ignore the rest.
 
-| Package | What it does | Runtime dependencies |
+## The shortest path
+
+Every extension ships a ready-made descriptor. Pass it to `createSpace` and you
+have a working server-side feature — no reducer wiring of your own:
+
+```ts
+import { createSpace } from '@insession/space';
+import { chatExtension } from '@insession/extension-chat';
+import { pomodoroExtension } from '@insession/extension-pomodoro';
+
+const space = createSpace({ extensions: [chatExtension(), pomodoroExtension()] });
+
+const effects = space.dispatch('pomodoro', 'start');
+// -> [{ type: 'broadcast', ... }, { type: 'schedule-timer', ... }]
+```
+
+`space` performs no I/O. `dispatch` folds the action through the matching
+extension's `reduce` and hands back `SpaceEffect[]` — `broadcast`,
+`send-to-sender`, `schedule-timer`, or a domain-specific effect — for you to
+execute against your own socket, storage and timers.
+
+On the client, `space.clientExtensions()` hands the same extensions' client-side
+fold to `space-state`'s `plugins` option, so the server's extension list and the
+client's plugin list describe the same features without either package importing
+the other.
+
+> `space-state` calls the client-side descriptor a **plugin**
+> (`definePluginClient`); `space` calls the server-side one an **extension**
+> (`defineSpaceExtension`). Read "plugin" as "the client half" and "extension"
+> as "the server half" — they are two halves of the same feature.
+
+## The packages
+
+| Package | What it does | Reach for it when |
 | --- | --- | --- |
-| [`@insession/space`](/packages/space/) | The parent package. Builds a headless space out of extensions: the contract (`defineSpaceExtension`), the aggregate registry, member/presence lifecycle, and an instance (`createSpace`) that turns accepted actions into effect descriptors. Performs no I/O itself. | none |
-| [`@insession/ws-resilient-transport`](/packages/ws-resilient-transport/) | Keeps a WebSocket connected across deploys: fast reconnect on service restart, jittered backoff otherwise, terminal close codes that stop retrying. | none |
-| [`@insession/space-state`](/packages/space-state/) | Holds the state of a shared room — members, chat, presence, typing, plugins — as a pure reducer over inbound messages. | none |
-| [`@insession/extension-chat`](/packages/extension-chat/) | A server-authoritative chat state machine: message normalization, sticker allowlisting, replies, reactions, pins. `reduce` returns `{ state, effects }` — persistence, broadcast, and bot notification are effect descriptors. | none |
-| [`@insession/extension-pomodoro`](/packages/extension-pomodoro/) | A server-authoritative Pomodoro timer state machine: pure `reduce`, plus `restore`/`persistState` for the storage boundary. | none |
-| [`@insession/extension-whiteboard`](/packages/extension-whiteboard/) | A server-authoritative Whiteboard state machine: shared free-draw strokes/shapes plus an optional "drawing telephone" relay game. | none |
-| [`@insession/extension-watch-party`](/packages/extension-watch-party/) | A server-authoritative Watch Party state machine: synchronized video/audio playback with a queue and history. `reduce` returns `{ state, effects }` — no I/O of its own. | none |
+| [`@insession/space`](/packages/space/) | The parent package. Builds a headless space out of extensions: the contract (`defineSpaceExtension`), the aggregate registry, member/presence lifecycle, and an instance (`createSpace`) that turns accepted actions into effect descriptors. | You want to assemble a whole space instead of wiring each state machine by hand. |
+| [`@insession/ws-resilient-transport`](/packages/ws-resilient-transport/) | Keeps a WebSocket connected across deploys: fast reconnect on service restart, jittered backoff otherwise, terminal close codes that stop retrying. | You have a WebSocket that drops on every deploy. It knows nothing about rooms or state. |
+| [`@insession/space-state`](/packages/space-state/) | Holds the state of a shared room — members, chat, presence, typing, plugins — as a pure reducer over inbound messages. | You are modelling a shared room on the client and want the state logic testable. Keep your existing transport. |
+| [`@insession/extension-chat`](/packages/extension-chat/) | Message normalization, sticker allowlisting, replies, reactions, pins. | You need chat. Persistence, broadcast and bot notification come back as effect descriptors, not I/O the package performs. |
+| [`@insession/extension-pomodoro`](/packages/extension-pomodoro/) | A shared timer with declarations and cheers, plus `restore`/`persistState` for the storage boundary. | You need a timer people start, pause and skip together. Bring your own transport and storage. |
+| [`@insession/extension-whiteboard`](/packages/extension-whiteboard/) | Shared free-draw strokes/shapes plus an optional "drawing telephone" relay game. | You need a shared drawing canvas. Same shape as `extension-pomodoro`. |
+| [`@insession/extension-watch-party`](/packages/extension-watch-party/) | Synchronized video/audio playback with a queue and history. | You need synchronized playback. Like chat, it has genuine side effects (broadcast, persist, resolve a title) — returned as descriptors so `reduce` stays pure. |
 
-## How they fit together
-
-There are no import edges between any of them. `space` does not depend on the
-state machines it assembles, the transport does not depend on the store, and
-the store does not depend on the transport — you wire all of it yourself:
-
-```
-  your server                                your client
-     │                                           │
-     ├── @insession/space                        ├── @insession/space-state
-     │      extensions: [Chat, Pomodoro, …]       │      createSpaceStore({
-     │      space.dispatch(appId, action)         │        plugins: space.clientExtensions(),
-     │        → SpaceEffect[] (you execute)       │      })
-     │              │                             │              │
-     │              │                             │    store.onSend(msg) ──┐
-     │              │                             │    store.receive(msg) <┘
-     │              │                             │              │
-     └── @insession/ws-resilient-transport ───────┴──────────────┘
-                (you wire the socket between server and client)
-```
-
-`space` never opens a socket or touches storage: `space.dispatch(...)` folds an
-action through the matching extension's `reduce` and hands back `SpaceEffect[]`
-— `broadcast`, `send-to-sender`, `schedule-timer`, or a domain-specific effect —
-for you to execute. `space.clientExtensions()` hands the same extensions'
-client-side fold to `space-state`'s `plugins` option, so the server's extension
-list and the client's plugin list describe the same features without either
-package importing the other. Below `space`, the transport still knows nothing
-about rooms: the store hands outbound messages to whatever you registered with
-`onSend`, and you feed inbound messages back in with `receive`. Wiring any two
-of these together is a handful of lines, and in exchange every piece stays
-testable with no server and no browser at all.
-
-### "Plugin" vs "extension": the same slice, two names
-
-`@insession/space-state` calls the client-side descriptor a **plugin**
-(`definePluginClient`) — that option predates `@insession/space` and the name
-stuck. `@insession/space` calls the server-side descriptor an **extension**
-(`defineSpaceExtension`) — it's what gets registered and dispatched to. They
-are two halves of the same feature: `extension-chat`'s server half is a
-`defineSpaceExtension`, and its client half (the fold that reacts to
-`app-state`) is shaped like a `definePluginClient` and reaches `space-state`
-via `space.clientExtensions()`. Renaming either would be a breaking API
-change, so the mismatch stays — read "plugin" as "the client half" and
-"extension" as "the server half" wherever the two show up together.
-
-## Which one do I want?
-
-- **You want to assemble a whole space instead of wiring each state machine by
-  hand.** Take `@insession/space` as the center: pass your extensions to
-  `createSpace`, dispatch actions into it, and execute the `SpaceEffect[]` it
-  hands back. Feed `space.clientExtensions()` into `space-state`'s `plugins`
-  option and the client side falls out for free.
-- **You have a WebSocket that drops on every deploy.** Take
-  `ws-resilient-transport` alone. It knows nothing about rooms or state.
-- **You are modelling a shared room and want the state logic testable.** Take
-  `space-state` alone, and keep your existing transport.
-- **Both, in a React app.** Take `ws-resilient-transport` and `space-state`.
-  There is no React package: `getState` / `subscribe` are already shaped for
-  `useSyncExternalStore`, so the binding is one line you keep in your own code.
-- **You need chat: messages, stickers, replies, reactions, pins.** Take
-  `extension-chat` alone. `reduce` returns `{ state, effects }` — persistence,
-  broadcast, and bot notification are effect descriptors, not I/O the package
-  performs itself.
-- **You need a shared timer people can start, pause and skip together.** Take
-  `extension-pomodoro` alone. It is a state machine only — bring your own transport
-  and storage.
-- **You need a shared drawing canvas, optionally with a "drawing telephone"
-  relay game.** Take `extension-whiteboard` alone. Same shape as
-  `extension-pomodoro` — a state machine only.
-- **You need synchronized video/audio playback with a queue.** Take
-  `extension-watch-party` alone. Like `extension-chat`, it has genuine side
-  effects (broadcast, persist, resolve a title) — `reduce` returns them as
-  effect descriptors instead of performing them, so it stays a pure function
-  you can test without a transport. `extension-pomodoro` and
-  `extension-whiteboard` don't need this: their side effects are just a timer
-  you drive yourself.
+All seven have **zero runtime dependencies**. The four `extension-*` packages
+are server-authoritative state machines whose `reduce` returns
+`{ state, effects } | null`.
 
 ## Install
 
@@ -101,10 +60,31 @@ change, so the mismatch stays — read "plugin" as "the client half" and
 npm install @insession/space
 ```
 
-Every package ships as built ESM (`dist/index.js` + `dist/index.d.ts`) with
-TypeScript types included. Node 22.18+ or any modern bundler.
+Every package ships built, with TypeScript types included. `space` and the four
+`extension-*` packages ship both ESM (`dist/index.js`) and CommonJS
+(`dist/index.cjs`), so a server that `require()`s them works too. `space-state`
+and `ws-resilient-transport` are ESM-only. Node 22.18+ or any modern bundler.
 
-## Wiring the two together
+## Bringing your own transport
+
+`space` never opens a socket. Below it, the transport still knows nothing about
+rooms: the store hands outbound messages to whatever you registered with
+`onSend`, and you feed inbound messages back in with `receive`.
+
+```
+  your server                                your client
+     │                                           │
+     ├── @insession/space                        ├── @insession/space-state
+     │      extensions: [Chat, Pomodoro, …]      │      createSpaceStore({
+     │      space.dispatch(appId, action)        │        plugins: space.clientExtensions(),
+     │        → SpaceEffect[] (you execute)      │      })
+     │              │                            │              │
+     │              │                            │    store.onSend(msg) ──┐
+     │              │                            │    store.receive(msg) <┘
+     │              │                            │              │
+     └── @insession/ws-resilient-transport ──────┴──────────────┘
+                (you wire the socket between server and client)
+```
 
 ```ts
 import { createSpaceStore } from '@insession/space-state';
@@ -134,13 +114,6 @@ Side effects the store asks for (a sound, a notification, a timer) arrive
 separately through `store.onEffect` — the store describes them, your app decides
 what they mean.
 
-## Next
-
-- [`space`](/packages/space/) — `defineSpaceExtension`, `createSpace`, and the full effect list
-- [`ws-resilient-transport`](/packages/ws-resilient-transport/) — every reconnect option, and what to do on the server
-- [`space-state`](/packages/space-state/) — the full store API, the effect list, and the plugin contract
-- [`extension-chat`](/packages/extension-chat/) — the chat action list and sticker allowlisting
-- [`extension-pomodoro`](/packages/extension-pomodoro/) — the timer action list and persistence helpers
-- [`extension-whiteboard`](/packages/extension-whiteboard/) — the drawing action list and the relay game
-- [`extension-watch-party`](/packages/extension-watch-party/) — the playback action list and effect shapes
-- [React binding](/examples/react-binding/) — the one-line hook, and why there is no `getServerSnapshot`
+Using React? There is no binding package to install: `getState` / `subscribe`
+already satisfy `useSyncExternalStore`, so [one line of your
+own](/examples/react-binding/) is the whole hook.

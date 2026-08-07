@@ -62,11 +62,6 @@ npm install @insession/extension-watch-party
 ESM（`dist/index.js`）と CommonJS（`dist/index.cjs`）の両方のエントリポイントに `dist/index.d.ts` の
 型を添えたビルド済みパッケージとして配布され、ランタイム依存はありません。
 
-:::note[0.4.0 で改名しました]
-`@insession/plugin-watch-party-state` から改名しました。旧名は npm 上で deprecated です。
-API は下記の `watchPartyExtension` が増えた以外に変更はありません。
-:::
-
 ## スペースに載せる
 
 [`@insession/space`](/ja/packages/space/) でスペースを組み立てているなら、組み込みは1行です。

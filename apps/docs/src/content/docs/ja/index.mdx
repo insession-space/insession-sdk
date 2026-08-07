@@ -21,6 +21,20 @@ hero:
   <span>npm install @insession/space</span>
 </div>
 
+## 最短路
+
+どの extension もそのまま渡せる記述子を持っているので、サーバー側の機能が1行で動きます。
+返ってきた effect をどう扱うかは[はじめかた](/ja/getting-started/)を参照してください。
+
+```ts
+import { createSpace } from '@insession/space';
+import { pomodoroExtension } from '@insession/extension-pomodoro';
+
+const space = createSpace({ extensions: [pomodoroExtension()] });
+
+space.dispatch('pomodoro', 'start'); // -> [broadcast, schedule-timer]
+```
+
 ## パッケージ
 
 <div class="pkg-grid">
@@ -154,29 +168,3 @@ hero:
   採用できます。React で使う場合も、入れるバインディングのパッケージはありません。
   <a href="/ja/examples/react-binding/">自分で書く1行</a>がフックの全部です。
 </p>
-
-## なぜこれを使うのか
-
-<div class="selling-grid">
-  <div>
-    <h3>下に何も入らない</h3>
-    <p>
-      トランスポートと store のランタイム依存はゼロ。フレームワークもソケットライブラリも DOM も
-      要りません。これは偶然ではなく、このパッケージの狙いそのものです。
-    </p>
-  </div>
-  <div>
-    <h3>サーバーなしでテストできる</h3>
-    <p>
-      store はただのオブジェクトを受け取り、ただの記述子を返します。だから状態遷移まるごとを
-      <code>node --test</code> のプロセス内で assert できます — ブラウザもソケットも実時間の待ちも不要。
-    </p>
-  </div>
-  <div>
-    <h3>実際のデプロイが形を決めた</h3>
-    <p>
-      再接続の挙動は「デプロイのたびに全クライアントが同時に切れる」という現実から来ています。
-      サービス再起動時は高速に、ジッターで殺到を避け、サーバーが二度と受け付けないと言ったら止まる。
-    </p>
-  </div>
-</div>

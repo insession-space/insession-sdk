@@ -20,8 +20,9 @@ description: 依存ゼロの、サーバーを正とするポモドーロタイ�
 - **時計はサーバーが持ち、クライアントは刻まない。** 動作中の state は減っていくカウンターではなく
   `endsAt`（壁時計の epoch ミリ秒）を持ちます。クライアントは `endsAt` からカウントダウンを描けば
   よく、毎秒ブロードキャストする必要はありません。
-- **`reduce` は純関数。** `(state, action, payload) => nextState | null`。I/O をせず、内部でタイマーを
-  張ることもありません。`null` は「このアクションを無視する」という意味です（例: 停止中の `pause`）。
+- **`reduce` は純関数。** `(state, action, payload) => { state, effects } | null`。I/O をせず、内部で
+  タイマーを張ることもありません。effect は実行せず記述して返すだけで、`null` は「このアクションを
+  無視する」という意味です（例: 停止中の `pause`）。
 - **宣言と声援が組み込み。** 各メンバーは「いま何をやっているか」を一行で宣言でき、他人の宣言に対する
   声援をトグルできます。スコープも長さの上限もこちら側で面倒を見ます。
 - **`restore` は設計として防御的。** ストレージ層が返してきたものを — 壊れた JSON であっても —
@@ -39,11 +40,6 @@ npm install @insession/extension-pomodoro
 
 ESM（`dist/index.js`）と CommonJS（`dist/index.cjs`）の両方のエントリポイントに `dist/index.d.ts` の型を
 添えたビルド済みパッケージとして配布され、ランタイム依存はありません。
-
-:::note[0.2.0 で改名しました]
-`@insession/plugin-pomodoro-state` から改名しました。旧名は npm 上で deprecated です。
-API は下記の `pomodoroExtension` が増えた以外に変更はありません。
-:::
 
 ## スペースに載せる
 
@@ -75,6 +71,7 @@ import {
   reduce,
   restore,
   timerDelay,
+  type PomodoroEffect,
   type PomodoroState,
 } from '@insession/extension-pomodoro';
 
@@ -84,9 +81,10 @@ let state: PomodoroState = defaultState();
 // クライアントのアクションが transport（WebSocket 等）経由で届く。`by` は操作したメンバーを
 // 指し、それをどう導くか（セッション・認証…）はあなたの判断。
 function onClientAction(action: string, payload: unknown) {
-  const next = reduce(state, action, payload as Record<string, unknown>);
-  if (!next) return; // 無効、または no-op — 何も変わっていないので配信するものも無い
-  state = next;
+  const result = reduce(state, action, payload as Record<string, unknown>);
+  if (!result) return; // 無効、または no-op — 何も変わっていないので配信するものも無い
+  state = result.state;
+  for (const effect of result.effects) runEffect(effect); // 下記「Effect」を参照
   broadcastToRoom({ type: 'extension-pomodoro', state });
   schedulePhaseTimer();
 }
@@ -98,7 +96,7 @@ function schedulePhaseTimer() {
   const delay = timerDelay(state);
   if (delay === null) return; // 動作中でない — 張るものは無い
   phaseTimer = setTimeout(() => {
-    state = onTimer(state);
+    state = onTimer(state).state; // ここでの effects は常に空
     broadcastToRoom({ type: 'extension-pomodoro', state });
     schedulePhaseTimer();
   }, delay);
@@ -159,13 +157,10 @@ function saveToDb() {
 | `{ type: 'delete-declaration', uid }` | サインイン済みのメンバーが宣言を消した。 |
 
 ```ts
-const result = reduce(state, 'declare', { by: name, uid, text });
-if (result) {
-  state = result.state;
-  for (const effect of result.effects) {
-    if (effect.type === 'persist-declaration') db.upsert(spaceId, effect.uid, effect.text);
-    else db.delete(spaceId, effect.uid);
-  }
+// 上の「使い方」で参照している `runEffect`。
+function runEffect(effect: PomodoroEffect) {
+  if (effect.type === 'persist-declaration') db.upsert(spaceId, effect.uid, effect.text);
+  else db.delete(spaceId, effect.uid);
 }
 ```
 

@@ -57,11 +57,6 @@ npm install @insession/extension-chat
 ESM（`dist/index.js`）と CommonJS（`dist/index.cjs`）の両方のエントリポイント、および
 `dist/index.d.ts` の型を含むビルド済みパッケージとして配布しています。ランタイム依存はありません。
 
-:::note[0.2.0 で改名しました]
-`@insession/chat-state` から改名しました。旧名は npm 上で deprecated です。
-API は下記の `chatExtension` が増えた以外に変更はありません。
-:::
-
 ## スペースに載せる
 
 [`@insession/space`](/ja/packages/space/) でスペースを組み立てているなら、組み込みは1行です。

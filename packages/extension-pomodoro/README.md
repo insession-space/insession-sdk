@@ -14,9 +14,10 @@ This package is that state machine, with none of the plumbing:
   `endsAt` — a wall-clock epoch ms — instead of a decrementing counter. Render
   the countdown from `endsAt` on the client; there is no need to broadcast
   every second.
-- **`reduce` is a pure function.** `(state, action, payload) => nextState |
-  null`. No I/O, no timers started inside it — `null` means "ignore this
-  action" (e.g. `pause` while already stopped).
+- **`reduce` is a pure function.** `(state, action, payload) => { state, effects
+  } | null`. No I/O, no timers started inside it — the effects are descriptions
+  you execute, and `null` means "ignore this action" (e.g. `pause` while already
+  stopped).
 - **Declarations and cheers are built in.** Each member can post a one-line
   "what I'm doing" declaration and toggle cheers on others' declarations,
   scoped and clamped for you.
@@ -38,10 +39,6 @@ npm install @insession/extension-pomodoro
 Published as a built package with both ESM (`dist/index.js`) and CommonJS
 (`dist/index.cjs`) entry points plus `dist/index.d.ts` types, no runtime
 dependencies.
-
-> Renamed from `@insession/plugin-pomodoro-state` at 0.2.0. The old name is
-> deprecated on npm; the API is unchanged apart from the addition of
-> `pomodoroExtension` below.
 
 ## Drop it into a space
 
@@ -75,6 +72,7 @@ import {
   reduce,
   restore,
   timerDelay,
+  type PomodoroEffect,
   type PomodoroState,
 } from '@insession/extension-pomodoro';
 
@@ -84,9 +82,10 @@ let state: PomodoroState = defaultState();
 // A client action arrives over your transport (WebSocket, etc). `by` identifies
 // the acting member; it's your call how you derive it (session, auth, ...).
 function onClientAction(action: string, payload: unknown) {
-  const next = reduce(state, action, payload as Record<string, unknown>);
-  if (!next) return; // invalid or a no-op — nothing changed, nothing to broadcast
-  state = next;
+  const result = reduce(state, action, payload as Record<string, unknown>);
+  if (!result) return; // invalid or a no-op — nothing changed, nothing to broadcast
+  state = result.state;
+  for (const effect of result.effects) runEffect(effect); // see "Effects" below
   broadcastToSpace({ type: 'extension-pomodoro', state });
   schedulePhaseTimer();
 }
@@ -98,7 +97,7 @@ function schedulePhaseTimer() {
   const delay = timerDelay(state);
   if (delay === null) return; // not running — nothing to schedule
   phaseTimer = setTimeout(() => {
-    state = onTimer(state);
+    state = onTimer(state).state; // effects are always empty here
     broadcastToSpace({ type: 'extension-pomodoro', state });
     schedulePhaseTimer();
   }, delay);
@@ -160,13 +159,10 @@ write.
 | `{ type: 'delete-declaration', uid }` | A signed-in member cleared their declaration. |
 
 ```ts
-const result = reduce(state, 'declare', { by: name, uid, text });
-if (result) {
-  state = result.state;
-  for (const effect of result.effects) {
-    if (effect.type === 'persist-declaration') db.upsert(spaceId, effect.uid, effect.text);
-    else db.delete(spaceId, effect.uid);
-  }
+// The `runEffect` referenced in Usage above.
+function runEffect(effect: PomodoroEffect) {
+  if (effect.type === 'persist-declaration') db.upsert(spaceId, effect.uid, effect.text);
+  else db.delete(spaceId, effect.uid);
 }
 ```
 
