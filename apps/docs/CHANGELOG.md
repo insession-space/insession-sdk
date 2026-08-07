@@ -1,5 +1,15 @@
 # @insession/docs
 
+## 0.0.9
+
+### Patch Changes
+
+- Updated dependencies [38bb35d]
+  - @insession/extension-pomodoro@0.3.1
+  - @insession/extension-whiteboard@0.4.1
+  - @insession/extension-watch-party@0.4.2
+  - @insession/extension-chat@0.2.2
+
 ## 0.0.8
 
 ### Patch Changes
