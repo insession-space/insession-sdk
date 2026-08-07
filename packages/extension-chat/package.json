@@ -1,6 +1,6 @@
 {
   "name": "@insession/extension-chat",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A dependency-free, framework-agnostic chat state machine for realtime shared rooms: message normalization, sticker/emoji validation, reply and reaction handling, and a pinned message. reduce() is a pure function that returns the next state plus effect descriptors for the host to execute.",
   "//": "このパッケージは insession-app の server 面のチャット処理(chat / chat-reaction / typing / pin-message ハンドラ)を切り出したもので、UI・i18n・design-system への依存を持たないため SDK に置ける。チャット本体は DB が権威で、サーバーがメモリに持つチャット関連の状態は pinnedMessage の1つだけ。したがってこのパッケージの主たる価値は状態の保持ではなく『正規化・検証・副作用の記述』にある。UI 側(space-core の chat-panel 等)は insession-app に残る。",
   "//exports": "ESM に加えて CJS も出しているのは、消費者である insession-app のサーバーが .ts を直接実行しており require() で読むため。ESM only にすると require が壊れる(extension-pomodoro / extension-whiteboard / extension-watch-party と同じ理由)。",
