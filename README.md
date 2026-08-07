@@ -18,8 +18,8 @@ InSession 本体（[`insession-app`](https://github.com/insession-space/insessio
 | [`@insession/space`](./packages/space) | **space の親パッケージ。** 依存ゼロで、ヘッドレスなスペースを extension の集合として組み立てる。extension 契約（`defineSpaceExtension`）・集約 registry・参加者ライフサイクル（members / presence / 参加・離脱）・インスタンス（`createSpace`）を持つ。WS サーバーとストレージは利用者が自前で持ち、こちらは I/O を一切行わず effect 記述子を返すだけ。**グローバルなアプリ一覧を持たず（extensions 配列が唯一の真実）**、状態は `name` で名前空間化される |
 | [`@insession/ws-resilient-transport`](./packages/ws-resilient-transport) | 本番デプロイの都合に合わせて再接続する WebSocket トランスポート。サービス再起動時の高速再接続とジッター付き指数バックオフを両立する。依存ゼロ |
 | [`@insession/space-state`](./packages/space-state) | transport・フレームワーク非依存のスペース状態 store。受信は純粋 reducer、副作用は記述子で返すだけ。依存ゼロ。`getState` / `subscribe` は `useSyncExternalStore` の形に合わせてあるので、React バインディングは消費側の1行で足りる（専用パッケージは出さない） |
-| [`@insession/extension-pomodoro`](./packages/extension-pomodoro) | 依存ゼロのポモドーロタイマー状態機械。server-authoritative で `reduce` は純関数 |
-| [`@insession/extension-whiteboard`](./packages/extension-whiteboard) | 依存ゼロのホワイトボード状態機械。自由描画の strokes/shapes と「お絵かき伝言ゲーム」relay を持つ `reduce` は純関数。唯一の外部依存（投稿画像URLの許可判定）はファクトリ `createWhiteboardState` の引数として注入する |
+| [`@insession/extension-pomodoro`](./packages/extension-pomodoro) | 依存ゼロのポモドーロタイマー状態機械。server-authoritative で `reduce` は `{ state, effects }` を返す純関数。一行宣言の永続化は effect 記述子としてホストに委ねる |
+| [`@insession/extension-whiteboard`](./packages/extension-whiteboard) | 依存ゼロのホワイトボード状態機械。自由描画の strokes/shapes と「お絵かき伝言ゲーム」relay を持つ `reduce` は `{ state, effects }` を返す純関数。完成アルバムの永続化は effect 記述子としてホストに委ねる。唯一の外部依存（投稿画像URLの許可判定）はファクトリ `createWhiteboardState` の引数として注入する |
 | [`@insession/extension-watch-party`](./packages/extension-watch-party) | 依存ゼロの Watch Party（動画/音声の同期再生）状態機械。`reduce` は `{ state, effects }` を返す純関数で、broadcast/persist/タイトル解決は effect 記述子としてホストに委ねる。唯一の外部依存（ランダム再生の選択ロジック）はファクトリ `createWatchParty` の `pickShuffleIndex` 引数として注入する |
 | [`@insession/extension-chat`](./packages/extension-chat) | 依存ゼロのチャット状態機械。メッセージの正規化・スタンプ検証・返信・リアクション・ピン留めを担う。ログはホストの DB が持つ前提で、メモリに置くのはピン留めだけ。ストレージにしか作れない値（永続 id 等）が要る3つの流れは、`reduce` を async にせず2段の往復（effect 記述子 → 結果を戻す）で表現する |
 
