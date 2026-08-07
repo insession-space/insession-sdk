@@ -72,11 +72,6 @@ npm install @insession/extension-whiteboard
 ESM（`dist/index.js`）と CommonJS（`dist/index.cjs`）の両方のエントリポイントに `dist/index.d.ts` の型を
 添えたビルド済みパッケージとして配布され、ランタイム依存はありません。
 
-:::note[0.2.0 で改名しました]
-`@insession/plugin-whiteboard-state` から改名しました。旧名は npm 上で deprecated です。
-API は下記の `whiteboardExtension` が増えた以外に変更はありません。
-:::
-
 ## スペースに載せる
 
 [`@insession/space`](/ja/packages/space/) でスペースを組み立てているなら、組み込みは1行です。
@@ -104,6 +99,7 @@ space.dispatch('whiteboard', 'add-stroke', { stroke }); // -> [broadcast, clear-
 ```ts
 import {
   createWhiteboardState,
+  type WhiteboardEffect,
   type WhiteboardState,
 } from '@insession/extension-whiteboard';
 
@@ -117,9 +113,13 @@ let state: WhiteboardState = whiteboard.defaultState();
 // クライアントのアクションが transport（WebSocket 等）経由で届く。`by` は操作したメンバーを
 // 指し、それをどう導くか（セッション・認証…）はあなたの判断。
 function onClientAction(action: string, payload: unknown) {
-  const next = whiteboard.reduce(state, action, payload as Record<string, unknown>);
-  if (!next) return; // 無効、または no-op — 何も変わっていないので配信するものも無い
-  state = next;
+  const result = whiteboard.reduce(state, action, payload as Record<string, unknown>);
+  if (!result) return; // 無効、または no-op — 何も変わっていないので配信するものも無い
+  for (const effect of result.effects) runEffect(effect); // 下記「Effect」を参照
+  // `state` を持たない結果は「effect だけ実行して state は変わらない」= ライブ relay の場合。
+  // ボードの配信もフェーズタイマーの張り直しもしない。
+  if (!('state' in result)) return;
+  state = result.state;
   broadcastToBoard({ type: 'extension-whiteboard', state });
   scheduleRelayTimer();
 }
@@ -131,9 +131,11 @@ function scheduleRelayTimer() {
   const delay = whiteboard.timerDelay(state);
   if (delay === null) return; // relay ゲームが動いていない — 張るものは無い
   relayTimer = setTimeout(() => {
-    const next = whiteboard.onTimer(state);
-    if (!next) return;
-    state = next;
+    const result = whiteboard.onTimer(state);
+    if (!result) return;
+    for (const effect of result.effects) runEffect(effect);
+    if (!('state' in result)) return;
+    state = result.state;
     broadcastToBoard({ type: 'extension-whiteboard', state });
     scheduleRelayTimer();
   }, delay);
@@ -212,11 +214,20 @@ relay フェーズのタイマーを張り直すことになります。**最後
 free-draw の編集は effect を出しません。
 
 ```ts
-const result = board.reduce(state, action, payload);
-if (result) {
-  state = result.state;
-  for (const effect of result.effects) {
-    db.insertRelayHistory(spaceId, { finishedAt: Date.now(), ...effect });
+// 上の「使い方」で参照している `runEffect`。
+function runEffect(effect: WhiteboardEffect) {
+  switch (effect.type) {
+    case 'persist-relay-history':
+      db.insertRelayHistory(spaceId, {
+        finishedAt: Date.now(),
+        players: effect.players,
+        chains: effect.chains,
+      });
+      break;
+    case 'relay':
+      // 送信者以外へフレームを転送する。保存はしない。
+      forwardToOthers({ type: 'whiteboard-relay', payload: effect.payload });
+      break;
   }
 }
 ```
@@ -226,7 +237,8 @@ if (result) {
 `WhiteboardState`、`WhiteboardMode`、`WhiteboardStroke`、`WhiteboardStrokePoint`、
 `WhiteboardStrokeStyle`、`WhiteboardShape`、`WhiteboardShapeType`、`WhiteboardShapeStyle`、
 `AnchorType`、`PathType`、`ArrowHead`、`RelayPhase`、`RelayGame`、`RelayChainEntry`、
-`WhiteboardAction`、`WhiteboardPayload`、`WhiteboardStateApi` はすべてエクスポートされています。
+`WhiteboardAction`、`WhiteboardPayload`、`WhiteboardEffect`、`WhiteboardReduceResult`、
+`WhiteboardStateApi` はすべてエクスポートされています。
 `reduce` の `action` 引数が `WhiteboardAction` ではなく `string` なのは意図的です — ここはアクション
 名が信用できない入力として届くワイヤ境界であり、既知の集合から外れたものはすべて `null` に落ちます。
 

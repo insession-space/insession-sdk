@@ -74,10 +74,6 @@ Published as a built package with both ESM (`dist/index.js`) and CommonJS
 (`dist/index.cjs`) entry points plus `dist/index.d.ts` types, no runtime
 dependencies.
 
-> Renamed from `@insession/plugin-whiteboard-state` at 0.2.0. The old name is
-> deprecated on npm; the API is unchanged apart from the addition of
-> `whiteboardExtension` below.
-
 ## Drop it into a space
 
 If you are assembling a space with
@@ -108,6 +104,7 @@ dependencies and everything below still works without it.
 ```ts
 import {
   createWhiteboardState,
+  type WhiteboardEffect,
   type WhiteboardState,
 } from '@insession/extension-whiteboard';
 
@@ -121,9 +118,13 @@ let state: WhiteboardState = whiteboard.defaultState();
 // A client action arrives over your transport (WebSocket, etc). `by` identifies
 // the acting member; it's your call how you derive it (session, auth, ...).
 function onClientAction(action: string, payload: unknown) {
-  const next = whiteboard.reduce(state, action, payload as Record<string, unknown>);
-  if (!next) return; // invalid or a no-op — nothing changed, nothing to broadcast
-  state = next;
+  const result = whiteboard.reduce(state, action, payload as Record<string, unknown>);
+  if (!result) return; // invalid or a no-op — nothing changed, nothing to broadcast
+  for (const effect of result.effects) runEffect(effect); // see "Effects" below
+  // A result without `state` means "run these effects, nothing changed" — the
+  // live relay case. Don't broadcast the board or re-arm the timer for it.
+  if (!('state' in result)) return;
+  state = result.state;
   broadcastToBoard({ type: 'extension-whiteboard', state });
   scheduleRelayTimer();
 }
@@ -135,9 +136,11 @@ function scheduleRelayTimer() {
   const delay = whiteboard.timerDelay(state);
   if (delay === null) return; // no relay game running — nothing to schedule
   relayTimer = setTimeout(() => {
-    const next = whiteboard.onTimer(state);
-    if (!next) return;
-    state = next;
+    const result = whiteboard.onTimer(state);
+    if (!result) return;
+    for (const effect of result.effects) runEffect(effect);
+    if (!('state' in result)) return;
+    state = result.state;
     broadcastToBoard({ type: 'extension-whiteboard', state });
     scheduleRelayTimer();
   }, delay);
@@ -220,11 +223,20 @@ all.
 effect. Free-draw edits produce none.
 
 ```ts
-const result = board.reduce(state, action, payload);
-if (result) {
-  state = result.state;
-  for (const effect of result.effects) {
-    db.insertRelayHistory(spaceId, { finishedAt: Date.now(), ...effect });
+// The `runEffect` referenced in Usage above.
+function runEffect(effect: WhiteboardEffect) {
+  switch (effect.type) {
+    case 'persist-relay-history':
+      db.insertRelayHistory(spaceId, {
+        finishedAt: Date.now(),
+        players: effect.players,
+        chains: effect.chains,
+      });
+      break;
+    case 'relay':
+      // Forward the frame to everyone but the sender. Store nothing.
+      forwardToOthers({ type: 'whiteboard-relay', payload: effect.payload });
+      break;
   }
 }
 ```
@@ -234,9 +246,10 @@ if (result) {
 `WhiteboardState`, `WhiteboardMode`, `WhiteboardStroke`, `WhiteboardStrokePoint`,
 `WhiteboardStrokeStyle`, `WhiteboardShape`, `WhiteboardShapeType`,
 `WhiteboardShapeStyle`, `AnchorType`, `PathType`, `ArrowHead`, `RelayPhase`,
-`RelayGame`, `RelayChainEntry`, `WhiteboardAction`, `WhiteboardPayload`, and
-`WhiteboardStateApi` are all exported. `reduce`'s `action` parameter is typed
-as `string` rather than `WhiteboardAction` on purpose — it sits at a wire
+`RelayGame`, `RelayChainEntry`, `WhiteboardAction`, `WhiteboardPayload`,
+`WhiteboardEffect`, `WhiteboardReduceResult`, and `WhiteboardStateApi` are all
+exported. `reduce`'s `action` parameter is typed as `string` rather than
+`WhiteboardAction` on purpose — it sits at a wire
 boundary where the action name is untrusted input, and anything outside the
 known set falls through to `null`.
 

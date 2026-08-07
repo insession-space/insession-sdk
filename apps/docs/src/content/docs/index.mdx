@@ -21,6 +21,21 @@ hero:
   <span>npm install @insession/space</span>
 </div>
 
+## The shortest path
+
+Every extension ships a ready-made descriptor, so a working server-side feature is
+one line — see [Getting started](/getting-started/) for what to do with the effects
+it hands back.
+
+```ts
+import { createSpace } from '@insession/space';
+import { pomodoroExtension } from '@insession/extension-pomodoro';
+
+const space = createSpace({ extensions: [pomodoroExtension()] });
+
+space.dispatch('pomodoro', 'start'); // -> [broadcast, schedule-timer]
+```
+
 ## The packages
 
 <div class="pkg-grid">
@@ -153,31 +168,3 @@ hero:
   them: it only describes the shape (<code>defaultState</code> / <code>reduce</code> / …) they
   already have. Using React? There is no binding package to install: <a href="/examples/react-binding/">one line of your own</a> is the whole hook.
 </p>
-
-## Why these
-
-<div class="selling-grid">
-  <div>
-    <h3>Nothing to install underneath</h3>
-    <p>
-      The transport and the store have zero runtime dependencies. No framework, no socket
-      library, no DOM. That is the point of them, not an accident.
-    </p>
-  </div>
-  <div>
-    <h3>Testable without a server</h3>
-    <p>
-      The store takes plain objects in and hands plain descriptors back, so a full state
-      transition is assertable in-process under <code>node --test</code> — no browser, no
-      sockets, no wall-clock waits.
-    </p>
-  </div>
-  <div>
-    <h3>Shaped by real deploys</h3>
-    <p>
-      The reconnect behaviour exists because every client drops at the same instant on every
-      deploy. Fast path on service restart, jitter so the fleet does not stampede, and a hard
-      stop when the server says never again.
-    </p>
-  </div>
-</div>
