@@ -12,7 +12,12 @@ dist/
 # Claude Code が作る git worktree の置き場。中に各ブランチのチェックアウトが丸ごと入るため、
 # 無視しないと biome が worktree 側の biome.json を「入れ子の root 設定」として拾い、
 # worktree が1つでも存在すると `pnpm verify` がローカルで落ちる（CI は clean checkout なので気づけない）。
-.claude/
+#
+# ⚠ `.claude/` ではなく `.claude/*` にしてあるのは、配下の一部（skills）だけを追跡するため。
+# git は「除外されたディレクトリの中身」を再包含できないので、ディレクトリごと無視すると
+# `!.claude/skills/` が効かない。worktrees は従来どおり無視され続ける。
+.claude/*
+!.claude/skills/
 
 # pnpm
 .pnpm-store/
