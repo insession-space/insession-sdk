@@ -175,10 +175,16 @@ const timer = definePluginClient({
   // Called on each app-state message for this id. The core has already stored
   // the latest value in state.apps[id]; return only your local slice, chat
   // lines to append, and effects to emit.
+  //
+  // Your extension's own state is under `msg.state` — `msg` itself is the
+  // envelope (`type`, `appId`, `state`, and optionally `action`/`by`).
   onAppState: ({ local, msg }) =>
-    local.phase === msg.phase
+    local.phase === msg.state.phase
       ? {}
-      : { local: { phase: msg.phase }, effects: [{ type: 'plugin-sound', appId: 'timer', sound: 'ding' }] },
+      : {
+          local: { phase: msg.state.phase },
+          effects: [{ type: 'plugin-sound', appId: 'timer', sound: 'ding' }],
+        },
 });
 
 createSpaceStore({ /* … */ plugins: [timer] });
@@ -186,7 +192,7 @@ createSpaceStore({ /* … */ plugins: [timer] });
 
 ### A note on `settings`
 
-`state.settings` is deliberately opaque (`Record<string, any>`). The store holds
+`state.settings` is deliberately opaque (`Record<string, unknown>`). The store holds
 and replaces it wholesale and never looks inside, so the settings type — and its
 defaults, via `initialSettings` — stay part of *your* wire contract rather than
 this package's. This is the same reasoning that keeps the store free of a server

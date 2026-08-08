@@ -1,26 +1,52 @@
-// space-state 独立化タスク（protocol 依存を切る作業）で追加した最小型定義。
-// @in-session/protocol にも同名の型がある。**こちらは汎用 SDK 側の最小定義**で、
-// protocol 側が InSession のワイヤ契約の正。両者がずれても構造が同じうちは代入可能なため
-// 静かに型検査を通ってしまう — そのずれは scripts/check-space-state-types.mjs（pnpm verify
-// に連結）で検出する。protocol 側の該当型を変えたら、この最小定義も追随させること。
+// Minimal definitions of the few server-owned shapes this package has to look
+// inside of.
 //
-// ⚠ SpaceSettings はここに持ち込まない。SpaceState.settings は `Record<string, any>`
-// として不透明に扱う（state.ts 参照）。設定の形は消費者ごとのワイヤ契約の一部であり、
-// 汎用 store が特定アプリ（InSession）の設定型を内蔵しているのは筋が通らないため。
+// They are kept deliberately small: this store works for any host, so it
+// describes only what its own reducer reads and leaves the rest of a host's
+// wire contract alone. A host with a richer type of its own can pass it
+// straight in — these are structural, so anything with the same fields fits.
+//
+// ⚠ A settings type is deliberately *not* here. `SpaceState.settings` stays
+// opaque (`Record<string, unknown>`) — see `state.ts` for why a
+// general-purpose store should not carry one application's settings shape.
 
-// チャットメッセージへの絵文字リアクションの集約。emoji→そのリアクションを付けた
-// 全員の name 一覧。reactedByMe は names に自分の name が含まれるかで各クライアントが
-// 導出するのでここには持たない（サーバーが配る生データ。protocol 側の同名型と同じ形）。
+/**
+ * Room for whatever a host attaches beyond the fields this package names.
+ *
+ * Every message and every transcript line extends this. The reducer reads
+ * only what it declares, and passes the rest through untouched — a host's own
+ * envelope, its ids, its timestamps — so nothing has to be stripped before
+ * calling in, and nothing is lost on the way out.
+ */
+export interface HostFields {
+  [key: string]: unknown;
+}
+
+/**
+ * Reactions on one message, keyed by emoji: how many, and who.
+ *
+ * Whether *you* reacted is not stored — each client derives it by looking for
+ * its own name in `names`, so the server can broadcast one shared value
+ * instead of a different one per recipient. See `toReactionsView`.
+ */
 export type ChatReactionSummary = Record<string, { count: number; names: string[] }>;
 
-// ピン留めされたメッセージ（同時に1件・サーバーが権威）。id だけだと chat-history 未着時に
-// 表示できないため、ピン留め時点の本文をスナップショット化して保持する。
+/**
+ * The pinned message. At most one per space, and the server decides.
+ *
+ * The text is snapshotted rather than referenced by id, because a member who
+ * hasn't loaded that far back in the transcript still has to be able to see
+ * what is pinned.
+ */
 export type PinnedMessage = {
   id: number;
   name: string;
   text: string;
-  // 元は protocol の ServerChatKind('text' | 'sticker' | 'agent')。汎用側では
-  // 特定アプリの列挙値を持ち込まず string に緩める。
+  /**
+   * How to render it — `'sticker'` is the one value this package's consumers
+   * commonly branch on. Left as `string` rather than an enum so a host can
+   * introduce its own kinds without this package knowing them.
+   */
   kind?: string;
   imageUrl?: string;
   createdAt?: number;

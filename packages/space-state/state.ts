@@ -1,91 +1,126 @@
-// スペース同期の core 状態（#1713）。use-space.ts の useState 群を1つの state 木へ集約したもの。
-// transport にも React にも依存しない純粋な型なので、useSyncExternalStore にも
-// 別の UI 層にも同じ形で載せられる。
+// The core state of a synchronized space: transport-agnostic, framework-
+// agnostic, and free of any wire contract of its own. The same tree can sit
+// behind `useSyncExternalStore` or behind any other UI layer.
+//
+// Two things are deliberately opaque here — `settings` and each extension's
+// slice under `apps`. This package never reads into either; it stores and
+// replaces them wholesale. Teaching a general-purpose store the settings type
+// of one particular application would make every other consumer carry it.
 
-// ⚠ @in-session/protocol には依存しない（space-state を transport/フレームワークだけでなく
-// InSession 固有のワイヤ契約からも切り離すための独立化タスク）。PinnedMessage は
-// ./types.ts に汎用 SDK 側の最小定義を持つ。SpaceSettings は持ち込まず、settings は
-// Record<string, any> として不透明に扱う（下記コメント参照）。
+import type { ChatLine } from './chat-lines.ts';
+import type { SpaceMember } from './messages.ts';
 import type { PinnedMessage } from './types.ts';
 
-// AI Agent の実況表示をクライアント側で強制終了するまでの時間（#1589）。
-// ⚠ サーバーの実行締め切り（runtime.ts の RUN_TIMEOUT_MS = 20秒）**より必ず長く**すること。
-//   短くすると、正常に走っている実行の実況を先に消してしまう。ここはあくまで
-//   「サーバーの idle が届かなかったとき」の最後の保険で、通常は発火しない。
+/**
+ * How long a client waits before forcing an agent's live status off screen.
+ *
+ * ⚠ Must be **longer than the host's own run deadline**. This is only a
+ * backstop for "the server's `idle` never arrived" — shortening it below the
+ * server's deadline would clear the status of a run that is still going fine.
+ */
 export const AGENT_STATUS_TIMEOUT_MS = 40_000;
 
-// 「終了済み」として覚えておく実行の数（#1589）。遅れて届いたフレームを弾くためだけの印なので、
-// 直近ぶんが残っていれば足りる。無制限に貯めると長時間の在室でメモリが増え続ける。
+/**
+ * How many finished runs to remember, so a frame that arrives after a run's
+ * `idle` can be recognized as stale and dropped. Only the recent ones matter,
+ * and an unbounded set would grow for as long as somebody stays in the room.
+ */
 export const AGENT_ENDED_RUNS_MAX = 32;
 
-// チャット行の保持上限。addChatLine は常に直近 200 行にトリムする（use-space.ts と同じ）。
+/** How many chat lines to keep. Older lines are dropped as new ones arrive. */
 export const CHAT_LINES_MAX = 200;
 
 export type SpaceState = {
-  // 初回 space-state を受信済みか（＝WS 接続確立の実質的な指標。#118）。UI の初回ローディング表示に使う。
+  /**
+   * Whether the first full state has been received — in practice, whether the
+   * connection is established. Hosts use it to close an initial loading state.
+   */
   connected: boolean;
-  // 自分のクライアントid（space-state の selfId）。Video Chat（#29）のグレア回避
-  // （自分より小さいidの側がofferを送る決定論ルール）等、id比較が要る plugin 向けに公開する。
+  /**
+   * This client's own connection id. Exposed because some extensions need to
+   * compare ids to break a tie deterministically (which peer sends the offer
+   * in a WebRTC handshake, for instance).
+   */
   selfId: number | null;
-  members: any[];
-  title: any;
-  // 現在ピン留め中のメッセージ(#1052)。同時に1件のみ・サーバーが権威。無ければ null
+  members: SpaceMember[];
+  title: string | null;
+  /** At most one at a time, decided by the server. */
   pinnedMessage: PinnedMessage | null;
-  owner: any;
-  // スペースの種別(#1419)。'my_space' はアカウントごとに1つ持つ常設スペース、'ephemeral' は
-  // 通常の使い捨てスペース。⚠ 既定は 'ephemeral'。owner の有無で代用してはいけない — 通常の
-  // スペースでも作成者がログイン中なら owner は立つので、owner を種別の判定に使うと
-  // 全スペースがマイスペース扱いになる。
+  owner: unknown;
+  /**
+   * ⚠ Never derive this from `owner`. A perfectly ordinary space has an owner
+   * whenever its creator is signed in, so using `owner` as the test would make
+   * every space look permanent.
+   */
   kind: 'ephemeral' | 'my_space';
-  // 紐づくコミュニティ(あれば)。トップバーのバッジ表示専用(#841)。owner と同じ流れ。
-  community: any;
-  // ⚠ 意図的に不透明（Record<string, any>）。store は settings の中身を一切読まず丸ごと
-  // 保持・置換するだけなので、InSession の SpaceSettings 型（YouTube 固有の設定まで含む
-  // 合成型）を汎用 store 側に持ち込む理由が無い。設定の形は消費者ごとのワイヤ契約の一部
-  // であり、消費者が自分の型へキャストして使う（既定値も createSpaceStore の
-  // initialSettings で消費者が注入する。下記 initialSpaceState 参照）。
-  settings: Record<string, any>;
-  // このスペースが紐づく community(#845)。設定の「公開範囲」で 'community' を選べるかの判定に使う。
-  communityId: any;
-  // サーバー側の機能可用性フラグ(尺上限はYOUTUBE_API_KEY設定時のみ)
+  community: unknown;
+  /**
+   * ⚠ Deliberately opaque. The store never reads a field of this — it holds
+   * and replaces the whole object. The shape of settings is part of each
+   * consumer's own wire contract, so consumers cast it to their own type, and
+   * supply the default through `createSpaceStore`'s `initialSettings`.
+   */
+  settings: Record<string, unknown>;
+  communityId: unknown;
+  /** Which optional server-side capabilities are available in this space. */
   features: { durationLimit: boolean };
-  // スペースアプリの状態 { [appId]: state }
-  apps: Record<string, any>;
-  // relay専用メッセージ(app-relay)で届く高頻度データを送信者別に保持 { [appId]: { [by]: payload } }。
-  // app-state と違いサーバーは保存しない(揮発)。ホワイトボードの描画リレーに使う
-  appRelay: Record<string, Record<string, any>>;
-  // AI Agent の実行状態(#1589)。{ [agentId]: { requestId, phase, tool } }。
-  // ⚠ app-relay と同じく**揮発**。space-state にも chat-history にも無いので、途中入室や
-  //   リロード直後は必ず空から始まる(サーバーが復元して配ることはしない)。
+  /** Extension state, keyed by extension/app id. Opaque to this package. */
+  apps: Record<string, unknown>;
+  /**
+   * The latest relayed frame per extension per sender. Unlike `apps`, the
+   * server never stores these — they are live, high-frequency data (a
+   * whiteboard's in-progress stroke) that only matters while it is current.
+   */
+  appRelay: Record<string, Record<string, unknown>>;
+  /**
+   * Live agent run status, keyed by agent id.
+   *
+   * ⚠ Volatile, like `appRelay`: it appears in neither the full state nor the
+   * chat history, so a client that joins late or reloads always starts empty.
+   */
   agentStatuses: Record<
     string,
     { requestId: string; phase: 'thinking' | 'working'; tool?: string }
   >;
-  chatLines: any[];
-  // 入力中インジケーター: 現在入力中のメンバー名一覧(揮発。DB保存なし・space-state 復元対象外)
+  chatLines: ChatLine[];
+  /** Who is currently typing. Volatile — never stored, never restored. */
   typingUsers: string[];
-  // ── 以下は現行 use-space.ts では useRef で持たれている「遷移検知用の直前値」。reducer が
-  //    前状態を引数で受け取れる以上 ref は不要になるので state へ引き上げた（純粋性のため）。
-  // 画面共有(#180)の直前の共有者。なし→ありへの遷移検知にだけ使う(表示状態そのものは
-  // 消費者が独自に screen-share-state を購読して持つ。ここは「開始ログを出すか」の判定専用)
+  // ── Below here: values that exist only so a transition can be detected by
+  //    comparing against the previous one. A reducer receives the previous
+  //    state as an argument, so they belong in the state tree rather than in
+  //    some mutable cell beside it.
+  /**
+   * Who was sharing their screen. Used *only* to tell "nobody → somebody"
+   * apart from every other screen-share update, so the log line is written
+   * once. The visible sharing state itself is the consumer's to hold.
+   */
   screenShareSharer: { id: number; name: string } | null;
-  // plugin(スペースアプリ)ごとのローカルスライス { [appId]: any }(#1720 step6)。
-  // 「直前のポモドーロ phase」のような plugin 固有の遷移検知用の値は、ここに plugin 自身が
-  // 持つ(core はキー=appId しか知らず、値の中身には一切踏み込まない)。plugin.ts の
-  // PluginClient.initLocal/onAppState が読み書きする。
-  pluginLocal: Record<string, any>;
-  // 終了済みの requestId（#1589）。**idle のあとに同じ実行の 'working' が届いても無視する**ための印。
-  // サーバー側でも置き去りの道具呼び出しは止めている（runtime.ts の RunState）が、フレームの
-  // 並べ替えはネットワーク側でも起きうるので受け側にも同じ判定を置く。FIFO・上限 AGENT_ENDED_RUNS_MAX。
+  /**
+   * A private slice per extension, keyed by extension id. An extension that
+   * needs its own previous value (the last Pomodoro phase, say) keeps it here.
+   * This package only knows the key; the value is never inspected. Written by
+   * `PluginClient.initLocal`/`onAppState` — see `plugin.ts`.
+   */
+  pluginLocal: Record<string, unknown>;
+  /**
+   * Runs already finished, so a `working` frame arriving after that run's
+   * `idle` is ignored. Frames can be reordered in transit, so the receiving
+   * side needs this check even though the server also stops stray work.
+   * FIFO, capped at `AGENT_ENDED_RUNS_MAX`.
+   */
   endedAgentRuns: string[];
-  // 現行 keyRef の採番カウンタ。チャット行の React key に使う（addChatLine のたびに +1）。
+  /** Source of the next chat line's `key`. See `pushChatLine`. */
   nextChatKey: number;
 };
 
-// initialSettings: 消費者が注入する settings の既定値（省略時 {}）。汎用 store は
-// InSession の既定値(defaultSettings())を知らないため、呼び出し側(createSpaceStore の
-// options 経由)が渡す。
-export function initialSpaceState(initialSettings: Record<string, any> = {}): SpaceState {
+/**
+ * A fresh, unconnected space.
+ *
+ * `initialSettings` is the consumer's default for `settings`; this package has
+ * no opinion about what settings are, so there is nothing sensible to default
+ * it to here. Passed in through `createSpaceStore`.
+ */
+export function initialSpaceState(initialSettings: Record<string, unknown> = {}): SpaceState {
   return {
     connected: false,
     selfId: null,

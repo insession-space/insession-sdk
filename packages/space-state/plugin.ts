@@ -1,52 +1,78 @@
-// スペースアプリ(plugin)が space-state の reducer に自分固有の知識を持ち込むための契約
-// (#1720 step6)。core(reduce.ts)は「app-state を apps[appId] へ最新値で格納する」ことしか
-// 知らず、各アプリ固有の操作ログ・フェーズ判定・効果音/通知は一切持たない。
-// plugin 側がこの型を実装した記述子を ReduceCtx.plugins に渡すことで、core を汚さずに
-// アプリごとの畳み込みを追加できる。
+// How an extension teaches the reducer about itself.
 //
-// ⚠ ReduceCtx はここで定義し reduce.ts が re-export する(逆にすると
-// reduce.ts ⇄ plugin.ts の循環 import になり depcruise の no-circular に違反する)。
-import type { SpaceEffect } from './effects.ts';
+// The core knows exactly one thing about extension state: store the latest
+// value at `apps[appId]`. Everything else an extension might want when its
+// state changes — a log line, a sound, a notification, its own previous value
+// — lives in a descriptor the extension supplies here. That is what keeps the
+// core free of any individual extension's knowledge.
+//
+// ⚠ `ReduceCtx` is defined here rather than in `reduce.ts`, which re-exports
+// it. The other direction would make `reduce.ts` and this module import each
+// other.
 
+import type { ChatLineInput } from './chat-lines.ts';
+import type { SpaceEffect } from './effects.ts';
+import type { AppStateMessage } from './messages.ts';
+
+/** Everything the reducer needs from the consumer to interpret a message. */
 export type ReduceCtx = {
-  // 現行 useSpace の `name` 引数(自分の表示名)。
+  /** This client's own display name. */
   selfName: string;
-  // 純粋な文言解決関数。消費者が注入する(i18n の t をそのまま渡せる)。
+  /**
+   * Resolves a message key to text. Pure — pass an i18n `t` straight in. The
+   * reducer never formats user-facing text itself.
+   */
   t: (key: string, ...args: any[]) => string;
-  // Date.now() の注入(通知 tag / createdAt 既定値に使う。reducer 内で直接 Date.now() を呼ばない)。
+  /**
+   * The current time, injected rather than read. The reducer never calls
+   * `Date.now()` itself, so a test can replay a session deterministically.
+   */
   now: number;
-  // 現行 presenceRef.current(space-state 受信時の再申告判定に使う)。
+  /** This client's presence, used to re-declare it after a reconnect. */
   presence: 'active' | 'away';
-  // settings 省略時のフォールバック既定値（消費者が createSpaceStore の initialSettings で
-  // 注入した値。store.ts の receive() が毎回積む）。space-state は特定アプリの設定既定値を
-  // 知らないため、reduce.ts はこれを使う（'msg.settings || ctx.defaultSettings'）。
-  defaultSettings: Record<string, any>;
-  // スペースアプリ(plugin)の記述子一覧(#1720 step6)。core は自分ではアプリ固有ロジックを
-  // 一切持たず、ここに渡された plugin だけが app-state を畳み込む。
-  // 省略時は空配列(plugin 非依存の消費者はこのフィールドを渡さなくてよい)。
+  /**
+   * What to use when a message carries no settings. This package has no idea
+   * what settings are, so the consumer supplies the default through
+   * `createSpaceStore`'s `initialSettings`.
+   */
+  defaultSettings: Record<string, unknown>;
+  /**
+   * The extensions taking part. The core holds no extension-specific logic of
+   * its own; only descriptors passed here fold extension state. Omitted means
+   * none, which is perfectly valid.
+   */
   plugins?: PluginClient[];
 };
 
 export type PluginClient = {
-  // protocol の APP_IDS と一致する識別子。
+  /** Matches the `appId` this extension's messages carry. */
   id: string;
-  // 入室/再接続(space-state)時に呼ばれる。ここで返した値がこの plugin 専用のローカル
-  // スライス(state.pluginLocal[id])の初期値になる。⚠ 「直前値を記録するだけ」に徹すること。
-  // ここで判定して effect を出すと、入室のたびに「状態が変わった」ことになり、鳴っては
-  // いけない場面で鳴ってしまう(#1591 で踏んだのと同じ理由)。
+  /**
+   * Called on join and on every reconnect. What it returns becomes this
+   * extension's private slice (`state.pluginLocal[id]`).
+   *
+   * ⚠ **Record the value and nothing else.** Deciding something here and
+   * emitting an effect for it would fire on every join, including reconnects
+   * — announcing a change that nobody made.
+   */
   initLocal?: (appState: any) => any;
-  // app-state 受信時、msg.appId === this.id のときだけ core(reduce.ts)から呼ばれる。
-  // apps[appId] への格納(最新値で置換)は core が既に行っているので、ここでは
-  // 「自分のローカルスライスの更新」と「チャットのログ行」「効果音/通知」だけを返せばよい。
-  onAppState?: (args: { local: any; msg: any; ctx: ReduceCtx }) => {
+  /**
+   * Called when this extension's state arrives — only for its own `appId`.
+   * Storing the new value under `apps[appId]` has already happened, so all
+   * that is left is this extension's own slice, its log lines, and its effects.
+   */
+  onAppState?: (args: { local: any; msg: AppStateMessage; ctx: ReduceCtx }) => {
     local?: any;
-    lines?: any[]; // pushChatLine に渡す行(順序どおりに積まれる)
+    /** Appended in order. */
+    lines?: ChatLineInput[];
     effects?: SpaceEffect[];
   };
 };
 
-// 型注釈を書かずに補完を効かせるための恒等関数(定義側で `: PluginClient` を書かずに済む)。
-// 実体は引数をそのまま返すだけで、ロジックは持たない。
+/**
+ * Identity function, so a descriptor can be written without a type annotation
+ * and still get completion. It returns its argument and nothing else.
+ */
 export function definePluginClient(c: PluginClient): PluginClient {
   return c;
 }

@@ -1,6 +1,12 @@
-// transport/React 非依存のスペース状態ストア（#1713）。受信は reduceSpace（純粋 reducer）に
-// 委ね、getState/subscribe は useSyncExternalStore にそのまま渡せる契約にしてある。
-// 副作用（音・通知・タイマー）の実行はしない。effects は onEffect の購読者へそのまま配るだけ。
+// The store: state in one place, a reducer for what arrives, plain functions
+// for what this client does, and no I/O of its own.
+//
+// Receiving goes through `reduceSpace`. Sending goes to whoever subscribed
+// with `onSend`. Effects go to whoever subscribed with `onEffect`, and are
+// never executed here. `getState`/`subscribe` satisfy `useSyncExternalStore`
+// as they are, which is why this package ships no React binding of its own —
+// see the README.
+
 import {
   addChatLine,
   appendLocalChat,
@@ -9,14 +15,18 @@ import {
   resetConnection,
   toggleReactionLocally,
 } from './actions.ts';
+import type { ChatLineInput } from './chat-lines.ts';
 import type { SpaceEffect } from './effects.ts';
-import type { PluginClient } from './plugin.ts';
-import { type ReduceCtx, reduceSpace } from './reduce.ts';
+import type { SpaceMessage } from './messages.ts';
+import type { PluginClient, ReduceCtx } from './plugin.ts';
+import { reduceSpace } from './reduce.ts';
 import { initialSpaceState, type SpaceState } from './state.ts';
 
-// チャット送信のローカルエコー行とサーバー採番idを対応付けるための一時ID(#236)。
-// crypto.randomUUID が使えない環境(非secure context等)向けにフォールバックする。
-// use-space.ts の genClientMsgId と同じ実装。
+/**
+ * Correlates a locally echoed message with the ack that carries its id.
+ * Falls back for environments without `crypto.randomUUID` (a page served over
+ * plain HTTP, for instance).
+ */
 function defaultGenClientMsgId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -24,21 +34,20 @@ function defaultGenClientMsgId(): string {
 
 export type SpaceStoreOptions = {
   selfName: string;
-  // 純粋な文言解決関数。消費者が注入する（i18n の t をそのまま渡せる）。
+  /** Resolves a message key to text. Pure — pass an i18n `t` straight in. */
   t: (key: string, ...args: any[]) => string;
   getPresence: () => 'active' | 'away';
-  // 既定 Date.now。テストや決定論的な再生のために差し替え可能にしてある。
+  /** Defaults to `Date.now`. Injected so a test can pin it. */
   now?: () => number;
   genClientMsgId?: () => string;
-  // スペースアプリ(plugin)の記述子一覧(#1720 step6)。省略時は空配列
-  // (core は自分ではアプリ固有ロジックを一切持たない)。
+  /** The extensions taking part. Omitted means none. */
   plugins?: PluginClient[];
-  // settings の初期値/既定値（省略時 {}）。space-state は特定アプリの設定既定値を
-  // 知らないため、消費者(useSpace)が自分のワイヤ契約の既定値(例: protocol の
-  // defaultSettings())をここで注入する。initialSpaceState の初期表示にも、
-  // reduce.ts が 'msg.settings が無いとき' のフォールバックにも同じ値を使う
-  // (ReduceCtx.defaultSettings。protocol 依存を切る独立化タスク)。
-  initialSettings?: Record<string, any>;
+  /**
+   * The value `settings` starts at, and falls back to when a message carries
+   * none. This package has no idea what settings are, so the consumer supplies
+   * its own default here.
+   */
+  initialSettings?: Record<string, unknown>;
 };
 
 export type SpaceStore = ReturnType<typeof createSpaceStore>;
@@ -46,9 +55,9 @@ export type SpaceStore = ReturnType<typeof createSpaceStore>;
 export function createSpaceStore(opts: SpaceStoreOptions) {
   const initialSettings = opts.initialSettings ?? {};
   let state = initialSpaceState(initialSettings);
-  // selfName / t は言語変更等であとから差し替えられる(use-space.ts の tRef と同じ理由。
-  // 現行の t は言語変更で差し替わっても再接続しないため)。opts をそのまま持たず、
-  // setSelfName/setT で更新できるミュータブルな変数として保持する。
+  // `selfName` and `t` can be replaced later — changing the interface language
+  // must not require tearing down the connection — so they are held as
+  // mutable variables rather than read out of `opts` each time.
   let selfName = opts.selfName;
   let t = opts.t;
   const getPresence = opts.getPresence;
@@ -57,17 +66,17 @@ export function createSpaceStore(opts: SpaceStoreOptions) {
   const plugins = opts.plugins ?? [];
 
   const listeners = new Set<() => void>();
-  const sendHandlers = new Set<(msg: any) => void>();
+  const sendHandlers = new Set<(msg: unknown) => void>();
   const effectHandlers = new Set<(e: SpaceEffect) => void>();
 
-  // 入力中通知の送信スロットル(1秒。use-space.ts の lastTypingSentRef と同じ)。
+  /** Throttles the typing notice to one per second. */
   let lastTypingSentAt = 0;
 
   function getState(): SpaceState {
     return state;
   }
 
-  // useSyncExternalStore 契約: state が変わらない限り同一参照を返す。
+  /** `useSyncExternalStore` contract: same reference until something changes. */
   function setState(next: SpaceState) {
     if (next === state) return;
     state = next;
@@ -79,7 +88,7 @@ export function createSpaceStore(opts: SpaceStoreOptions) {
     return () => listeners.delete(listener);
   }
 
-  function onSend(fn: (msg: any) => void) {
+  function onSend(fn: (msg: unknown) => void) {
     sendHandlers.add(fn);
     return () => sendHandlers.delete(fn);
   }
@@ -89,13 +98,19 @@ export function createSpaceStore(opts: SpaceStoreOptions) {
     return () => effectHandlers.delete(fn);
   }
 
-  // 生の送信。onSend の購読者(transport)へそのまま流すだけ。
-  function send(msg: any) {
+  /** Hands a message to the transport. Nothing is inspected on the way out. */
+  function send(msg: unknown) {
     for (const fn of sendHandlers) fn(msg);
   }
 
-  // 受信メッセージを reduceSpace へ通し、state を更新して effects を配る。
-  function receive(msg: any) {
+  /**
+   * Puts a received message through the reducer, applies the new state, and
+   * hands out the effects.
+   *
+   * `msg` is typed loosely on purpose: what arrives is whatever came off the
+   * wire, and the reducer already treats an unrecognized `type` as a no-op.
+   */
+  function receive(msg: SpaceMessage | Record<string, unknown>) {
     const ctx: ReduceCtx = {
       selfName,
       t,
@@ -104,7 +119,7 @@ export function createSpaceStore(opts: SpaceStoreOptions) {
       plugins,
       defaultSettings: initialSettings,
     };
-    const { state: next, effects } = reduceSpace(state, msg, ctx);
+    const { state: next, effects } = reduceSpace(state, msg as SpaceMessage, ctx);
     setState(next);
     for (const effect of effects) {
       for (const fn of effectHandlers) fn(effect);
@@ -119,18 +134,21 @@ export function createSpaceStore(opts: SpaceStoreOptions) {
     onEffect,
     send,
 
-    // チャット送信: サーバーは送信者を除外してブロードキャストするので、
-    // 自分の画面には即座にローカル表示する(往復待ちの遅延をなくす)。
-    // clientMsgId を添えて送り、サーバーから返る chat-ack で自分の行にも永続id(リアクションの
-    // 紐付け先)を反映する(#236)。ack到着までは id:null のためリアクションUIは出さない。
-    // replyTo(#324): 返信対象メッセージのスナップショット({id,name,text})。返信でなければ省略。
     chat: {
+      /**
+       * Sends a message and shows it immediately, rather than waiting for it
+       * to come back — the server broadcasts to everyone except the sender.
+       * The `clientMsgId` is what the server's ack comes back with, carrying
+       * the storage id that reactions and replies need. Until then the line
+       * has `id: null`, so a reaction control has nothing to attach to.
+       */
       send(text: string, replyTo?: { id: number; name: string; text: string }) {
         const clientMsgId = genClientMsgId();
         send({ type: 'chat', text, clientMsgId, replyToId: replyTo?.id ?? null });
-        // ローカルエコーには avatar を載せない(#1246)。自分は必ず在室しているので
-        // 消費者側の members 逆引きで解決できる。space-state はアプリ側の
-        // auth 依存(自分の avatar 値)を持ち込まないための意図的な非対称。
+        // The local echo deliberately carries no avatar: this client is by
+        // definition present, so the consumer can resolve it from the member
+        // list. Keeping it out avoids pulling one application's notion of
+        // "my avatar" into a general-purpose store.
         setState(
           appendLocalChat(state, {
             kind: 'chat',
@@ -146,9 +164,11 @@ export function createSpaceStore(opts: SpaceStoreOptions) {
         );
       },
 
-      // 画像スタンプメッセージの送信(#394)。imageUrl は呼び出し側が事前に
-      // POST /api/spaces/:id/stickers へアップロード済みの公開URL。send と同じく
-      // サーバーは送信者を除外してブロードキャストするのでローカルエコーする(id:nullでchat-ackを待つ)。
+      /**
+       * Sends an image sticker. `imageUrl` must already be somewhere the other
+       * members can fetch it from — uploading is the consumer's business.
+       * Echoed locally for the same reason as `send`.
+       */
       sendSticker(imageUrl: string) {
         const clientMsgId = genClientMsgId();
         send({ type: 'chat', text: '', clientMsgId, kind: 'sticker', imageUrl });
@@ -167,22 +187,28 @@ export function createSpaceStore(opts: SpaceStoreOptions) {
         );
       },
 
-      // メッセージへの絵文字リアクションをトグルする(#236)。id が無いメッセージ(ack未着・DB未設定)
-      // には送らない。送信と同時にローカルでもトグル反映する(#1089 楽観的更新)。
+      /**
+       * Toggles a reaction, optimistically. A message with no id yet (its ack
+       * hasn't arrived) can't be reacted to, so the call is dropped.
+       */
       react(messageId: number | null, emoji: string) {
         if (!messageId) return;
         send({ type: 'chat-reaction', messageId, emoji });
         setState(toggleReactionLocally(state, messageId, emoji, selfName));
       },
 
-      // メッセージのピン留め/解除(#1052)。messageId===null で解除。サーバーが全員へ配信し、
-      // 同時に1件だけという不変条件もサーバー側が保持する(クライアントは表示とアクションのみ)。
+      /**
+       * Pins a message, or unpins with `null`. The server broadcasts the
+       * result and is what keeps "at most one" true; this side only asks.
+       */
       pin(messageId: number | null) {
         send({ type: 'pin-message', messageId });
       },
 
-      // 入力中通知の送信: 呼び出し側は入力のたびに呼んでよい。ここで1秒以内の連打を間引く
-      // (サーバー・帯域への配慮。自分自身には何も表示しない)。
+      /**
+       * Says this client is typing. Safe to call on every keystroke — repeats
+       * within a second are dropped here rather than put on the wire.
+       */
       typing() {
         const t0 = now();
         if (t0 - lastTypingSentAt < 1000) return;
@@ -192,7 +218,7 @@ export function createSpaceStore(opts: SpaceStoreOptions) {
     },
 
     settings: {
-      update(patch: any) {
+      update(patch: unknown) {
         send({ type: 'update-space-settings', settings: patch });
       },
     },
@@ -203,25 +229,27 @@ export function createSpaceStore(opts: SpaceStoreOptions) {
       },
     },
 
-    // 🧩スイッチャーでの表示中カード切替をサーバーへ通知する。stage は 'player' | plugin の
-    // appId | null(未選択)。サーバーは送信者含む全員へ member-updated で配信する
+    /**
+     * Tells the server which card this client has open. The server relays it
+     * to everyone, including back to this client.
+     */
     stage: {
       change(stage: string | null) {
         send({ type: 'stage-change', stage });
       },
     },
 
-    // ローカルなシステム行の追加(現行 useSpace の公開 addChatLine と同義)。
-    addChatLine(line: any) {
+    /** Adds a line the consumer composed itself. */
+    addChatLine(line: ChatLineInput) {
       setState(addChatLine(state, line));
     },
 
-    // 名前ごとの自動クリアタイマー(3秒)の発火時に消費者から呼ぶ。
+    /** Called when the per-name typing timer fires. */
     clearTyping(name: string) {
       setState(clearTyping(state, name));
     },
 
-    // AI Agent 実況の取りこぼし保険タイマーの発火時に消費者から呼ぶ。
+    /** Called when an agent run's backstop timer fires. */
     expireAgentStatus(agentId: string, requestId: string) {
       setState(expireAgentStatus(state, agentId, requestId));
     },
@@ -230,7 +258,7 @@ export function createSpaceStore(opts: SpaceStoreOptions) {
       setState(resetConnection(state));
     },
 
-    // t は言語変更で差し替わっても再接続しない(use-space.ts の tRef と同じ理由)。
+    /** Replaceable without reconnecting — see the note in `createSpaceStore`. */
     setT(next: (key: string, ...args: any[]) => string) {
       t = next;
     },
