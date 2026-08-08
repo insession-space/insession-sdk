@@ -1,0 +1,535 @@
+/* サイト全体の意匠（方向性「Grid & hairline」）。
+ *
+ * **このファイルが持つのは "地" の質感だけ。** ページ固有のもの（デモ枠）は examples.css が持つ。
+ *
+ * ⚠ **色の値を書かないこと。** 使ってよいのは tokens.css が定義する `--ds-*`（= DS の `--color-*`）と、
+ * Starlight の `--sl-color-*` だけ。ここに hex を1つでも足すと、DS とドキュメントサイトで
+ * 同じ色を2箇所で管理することになる（tokens.css の先頭コメントと同じ規約）。
+ *
+ * ⚠ 読み込み順は astro.config.mjs の customCss で決まる（DS → tokens → site → examples）。
+ * DS だけが `@layer` の中に居るので、**layer 無しのこのファイルは常に DS より強い**。
+ * Starlight 本体のスタイルも layer 無しなので、そちらに勝つには詳細度か記述順で上回る必要がある
+ * （このファイルは customCss として Starlight のあとに入るため、同詳細度なら勝つ）。
+ *
+ * 意匠の骨子:
+ *   1. 面は「罫線」で切る。影と角丸を減らし、1px のヘアラインでブロックを区切る
+ *   2. ラベル・メタ情報はモノスペースの小文字トラッキング広め（本文の書体と役割を分ける）
+ *   3. アクセントは "現在地" と CTA にだけ使う。装飾に使わない
+ */
+
+:root {
+  /* 罫線1本ぶんの色。`--ds-border` そのままだと面の区切りとしては強すぎる箇所があるので、
+     ここで1段落として全体で共有する（値ではなく mix の指定なのでライト/ダーク両方に追随する）。 */
+  --dz-line: color-mix(in srgb, var(--ds-border) 88%, transparent);
+  /* 方眼の1マス。ヒーローの地と、後述のセクション頭の刻みで共有する。 */
+  --dz-grid: 88px;
+}
+
+/* ── ヘッダー ───────────────────────────────────────────
+ * 下端のヘアラインと背景ぼかしだけ。スクロールしても地と混ざらないようにする。 */
+
+header.header {
+  border-bottom: 1px solid var(--dz-line);
+  background: color-mix(in srgb, var(--sl-color-bg-nav) 82%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+/* 検索ボタンはヘッダーの中で一番目立つ箱なので、罫線だけの控えめな箱にする。 */
+site-search button[data-open-modal] {
+  border-color: var(--dz-line);
+  border-radius: var(--radius-md, 0.5rem);
+  background: color-mix(in srgb, var(--ds-surface) 55%, transparent);
+}
+
+site-search button[data-open-modal]:hover {
+  border-color: var(--ds-border-strong);
+  background: var(--ds-surface);
+}
+
+/* ── サイドバー / 目次 ──────────────────────────────────
+ * 群見出しをモノスペースの小さいラベルに落として、リンク本体との階層差を書体で付ける。 */
+
+.sidebar-pane {
+  border-inline-end: 1px solid var(--dz-line);
+}
+
+.sidebar-content .group-label .large {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-medium, 500);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ds-text-faint);
+}
+
+.sidebar-content ul > li {
+  border-inline-start-color: var(--dz-line);
+}
+
+.sidebar-content a {
+  border-radius: 0;
+  padding-block: 0.34rem;
+}
+
+/* 現在地は「塗り」ではなく左の刻みで示す。塗りにすると項目が増えたときに面が騒がしくなる。 */
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus {
+  background: color-mix(in srgb, var(--ds-accent) 10%, transparent);
+  box-shadow: inset 2px 0 0 var(--ds-accent);
+  color: var(--sl-color-white);
+}
+
+/* 右カラムの目次も同じ語彙で揃える。 */
+#starlight__on-this-page,
+starlight-toc summary .toggle {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ds-text-faint);
+}
+
+starlight-toc nav a {
+  border-radius: 0;
+}
+
+starlight-toc nav a[aria-current="true"] {
+  background: transparent;
+  box-shadow: inset 2px 0 0 var(--ds-accent);
+  color: var(--sl-color-white);
+}
+
+/* ── 本文の活字 ─────────────────────────────────────────
+ * 見出しは字間を締めて塊に見せる。h2 の上にヘアラインを引き、セクションの境界を面で示す。 */
+
+.sl-markdown-content h1,
+.content-panel h1 {
+  letter-spacing: -0.025em;
+}
+
+/* ⚠ **罫線は h2 ではなくラッパーに引く。** Starlight は h2 を
+ * `.sl-heading-wrapper` で包み、その中で h2 は文字幅までしか広がらない。
+ * h2 に border-top を付けると、見出しの長さぶんだけの短い線になって
+ * 「セクションの境界」に読めない（見出しごとに線の長さが変わる）。 */
+.sl-markdown-content .sl-heading-wrapper.level-h2 {
+  margin-top: 3.2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--dz-line);
+}
+
+.sl-markdown-content h2 {
+  font-size: 1.42rem;
+  letter-spacing: -0.018em;
+}
+
+.sl-markdown-content .sl-heading-wrapper.level-h2 > h2 {
+  margin-top: 0;
+}
+
+/* h2 直後の h3 は境界が二重に見えるので、上の余白だけ詰める。 */
+.sl-markdown-content h3 {
+  margin-top: 2rem;
+  font-size: 1.08rem;
+  letter-spacing: -0.012em;
+}
+
+/* 日本語は字間を締めると詰まって見えるので、トラッキングを戻す。 */
+[lang="ja"] .sl-markdown-content h2,
+[lang="ja"] .sl-markdown-content h3,
+[lang="ja"] .content-panel h1 {
+  letter-spacing: 0;
+}
+
+.sl-markdown-content :is(p, li) {
+  line-height: 1.75;
+}
+
+/* 見出しのアンカーリンクは hover まで出さない（既定でも薄いが、罫線と競合するので更に引く）。 */
+.sl-markdown-content .sl-anchor-link {
+  color: var(--ds-text-faint);
+}
+
+/* ── コードブロック / インラインコード ───────────────────
+ * expressive-code の枠を、他のブロックと同じヘアラインの語彙に寄せる。 */
+
+.expressive-code .frame pre,
+.expressive-code .frame .header {
+  border-color: var(--dz-line);
+}
+
+.expressive-code .frame pre {
+  border-radius: var(--radius-md, 0.5rem);
+  background: var(--ds-bg-elevated);
+}
+
+.expressive-code .frame.has-title .header,
+.expressive-code .frame.is-terminal .header {
+  background: var(--ds-surface);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+}
+
+.sl-markdown-content :not(pre) > code {
+  border: 1px solid var(--dz-line);
+  border-radius: var(--radius-xs, 0.25rem);
+  padding: 0.1em 0.36em;
+  font-size: 0.88em;
+}
+
+/* ── 表 ────────────────────────────────────────────────
+ * パッケージページは API 表が主役。塗りをやめて罫線だけで読ませる。 */
+
+.sl-markdown-content table {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.sl-markdown-content :is(th, td) {
+  border: 0;
+  border-bottom: 1px solid var(--dz-line);
+  padding: 0.6rem 0.9rem 0.6rem 0;
+  vertical-align: top;
+}
+
+.sl-markdown-content th {
+  border-bottom-color: var(--ds-border-strong);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-medium, 500);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ds-text-faint);
+}
+
+/* ── aside（注記）────────────────────────────────────── */
+
+.sl-markdown-content .starlight-aside {
+  border: 1px solid var(--dz-line);
+  border-inline-start-width: 2px;
+  border-radius: 0 var(--radius-md, 0.5rem) var(--radius-md, 0.5rem) 0;
+  background: color-mix(in srgb, var(--ds-surface) 60%, transparent);
+}
+
+.sl-markdown-content .starlight-aside__title {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── 前後ページ / フッター ───────────────────────────── */
+
+.pagination-links a {
+  border-color: var(--dz-line);
+  border-radius: var(--radius-md, 0.5rem);
+  box-shadow: none;
+  background: color-mix(in srgb, var(--ds-surface) 45%, transparent);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.pagination-links a:hover {
+  border-color: var(--ds-border-strong);
+  background: var(--ds-surface);
+}
+
+.pagination-links a > span {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ds-text-faint);
+}
+
+.pagination-links a .link-title {
+  font-family: var(--__sl-font, inherit);
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--sl-color-white);
+}
+
+.content-panel + .content-panel,
+footer .meta {
+  border-color: var(--dz-line);
+}
+
+/* ── トップページ（splash テンプレート）────────────────
+ * ヒーローは「方眼の地 + 上からのアクセントの落ち + 下端のヘアライン」の3枚だけで作る。 */
+
+.hero {
+  /* ⚠ **これを外さないこと。** 下の `::before` は `inset: 0` の絶対配置なので、
+     `.hero` が配置済みでないと基準が初期包含ブロック（ビューポート）になり、
+     方眼がヒーローの高さではなく画面の高さで描かれて位置がずれる。
+     Starlight 既定の `.hero` は position を持たない。 */
+  position: relative;
+  padding-block: clamp(2.75rem, 7vw, 5.5rem) clamp(2.25rem, 5vw, 4rem);
+  border-bottom: 1px solid var(--dz-line);
+}
+
+/* ⚠ 横方向の inset は必ず 0 で止める。負の値を左右に付けると、その分だけドキュメントが
+   横に広がり **ページ全体に横スクロールが出る**（疑似要素なので要素を走査しても犯人が
+   見つからず、実測で desktop 8px / mobile 20px はみ出した）。 */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--ds-accent) 9%, transparent),
+      transparent 55%
+    ),
+    repeating-linear-gradient(to right, var(--dz-line) 0 1px, transparent 1px var(--dz-grid)),
+    repeating-linear-gradient(to bottom, var(--dz-line) 0 1px, transparent 1px var(--dz-grid));
+  /* 方眼を端まで引くと枠に見えるので、左上から放射状に消す。 */
+  mask-image: radial-gradient(120% 90% at 20% 0%, #000 10%, transparent 75%);
+}
+
+/* 見出しの上に置く小さな符牒。**内容は index.mdx が持たない装飾ラベル**なので、
+   翻訳の要らない語（バージョンではなくパッケージの性質）に留めてある。 */
+.hero .copy::before {
+  content: "zero dependencies";
+  display: inline-block;
+  margin-bottom: 1.1rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--ds-accent) 35%, transparent);
+  border-radius: var(--radius-pill, 999px);
+  background: color-mix(in srgb, var(--ds-accent) 8%, transparent);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ds-accent-soft);
+}
+
+.hero h1 {
+  font-size: clamp(2.4rem, 5.6vw, 4rem);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+}
+
+[lang="ja"] .hero h1 {
+  letter-spacing: -0.01em;
+  line-height: 1.18;
+}
+
+/* 日本語は既定だと文節の途中で折れる（「リア/ルタイム」）。auto-phrase は
+   対応ブラウザでだけ効き、非対応では既定の挙動に戻るだけなので安全に足せる。 */
+[lang="ja"] :is(.hero h1, .hero .tagline, .content-panel h1, .sl-markdown-content h2) {
+  word-break: auto-phrase;
+}
+
+/* 符牒は CSS が文字列を持つので、言語ごとに差し替える。 */
+[lang="ja"] .hero .copy::before {
+  content: "依存ゼロ";
+  letter-spacing: 0.06em;
+}
+
+.hero .tagline {
+  color: var(--ds-text-dim);
+  max-width: 52ch;
+  font-size: 1.02rem;
+  line-height: 1.68;
+}
+
+.hero .actions {
+  margin-top: 0.5rem;
+}
+
+/* CTA。primary は accent の「塗り」— DS の役割どおり（accent は塗り専用）。 */
+.hero .sl-link-button.primary {
+  border-color: var(--ds-accent);
+  border-radius: var(--radius-md, 0.5rem);
+  background: var(--ds-accent);
+  color: var(--ds-on-accent);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.hero .sl-link-button.primary:hover {
+  border-color: color-mix(in srgb, #000 12%, var(--ds-accent));
+  background: color-mix(in srgb, #000 12%, var(--ds-accent));
+}
+
+/* secondary は罫線の箱。文字色に accent を使わない（accent は 4.5:1 を満たさない）。 */
+.hero .sl-link-button.minimal {
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--radius-md, 0.5rem);
+  background: color-mix(in srgb, var(--ds-surface) 55%, transparent);
+  color: var(--ds-text);
+}
+
+.hero .sl-link-button.minimal:hover {
+  background: var(--ds-surface);
+  color: var(--sl-color-white);
+}
+
+/* トップページの h2 だけ通し番号を振る。**ドキュメントページには振らない** —
+   パッケージページは h2 が10個以上あり、番号を振ると仕様書のように読めてしまう。 */
+body:has(.hero) .sl-markdown-content {
+  counter-reset: dz-section;
+}
+
+body:has(.hero) .sl-markdown-content h2 {
+  counter-increment: dz-section;
+}
+
+body:has(.hero) .sl-markdown-content h2::before {
+  content: counter(dz-section, decimal-leading-zero);
+  display: block;
+  margin-bottom: 0.5rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-normal, 400);
+  letter-spacing: 0.18em;
+  color: var(--ds-text-faint);
+}
+
+/* ── install スニペット ─────────────────────────────── */
+
+.install-line {
+  display: flex;
+  /* 狭い幅ではコマンドが2行に折れる。center だと `$` が2行の中間に浮くので、
+     1行目に揃うよう baseline で止める。 */
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-top: 2rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--dz-line);
+  border-radius: var(--radius-md, 0.5rem);
+  background: var(--ds-bg-elevated);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.9rem;
+  color: var(--ds-text);
+  overflow-x: auto;
+}
+
+.install-line .prompt {
+  color: var(--ds-accent-soft);
+  user-select: none;
+}
+
+/* ── パッケージ一覧 ─────────────────────────────────
+ * カードではなく「格子のセル」。境界は各セルの右下のヘアラインだけで引く。
+ *
+ * ⚠ **gap を空けて container の背景色を罫線に使う方式は採らない。** 7つのセルは
+ * 列数（auto-fit）によって最終行が埋まらず、その空きが罫線色のベタ面として出てしまう。
+ * セル自身に border を持たせれば、無いセルには線も出ない。
+ *
+ * ⚠ **全セルを等高にする（`grid-auto-rows: 1fr`）。** 説明文の長さがまちまちなので、
+ * 既定のままだと行ごとに高さが変わって段が揃わない。 */
+
+.pkg-grid {
+  display: grid;
+  gap: 0;
+  grid-auto-rows: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  margin-top: 1.75rem;
+  border: 1px solid var(--dz-line);
+  border-radius: var(--radius-md, 0.5rem);
+  /* 各セルが自分の右下に引く罫線を、外枠の上にぴったり重ねるため（下の負マージン参照）。 */
+  overflow: hidden;
+}
+
+.pkg-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1.4rem 1.3rem;
+  border: 0;
+  border-right: 1px solid var(--dz-line);
+  border-bottom: 1px solid var(--dz-line);
+  border-radius: 0;
+  /* 右端・下端のセルは自分の罫線が外枠と二重になるので、1px 分だけ外へ逃がして重ねる。 */
+  margin: 0 -1px -1px 0;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+/* ⚠ **Starlight の markdown ルールを打ち消す。**
+ * `.sl-markdown-content` は「最初の子以外」に `margin-top: 1rem` を配る。これが効くと
+ * 2枚目以降のカードがセルの中で 16px 下にずれ、**セルの高さは揃っているのにカードだけ
+ * 揃わない**（実測: 行 357px に対しカード 341px）。タグ列とリンク列も同じ理由でずれる。
+ * 間隔は上の `gap` が持つので、ここでは一律 0 に倒す。 */
+.pkg-grid .pkg-card,
+.pkg-card > * {
+  margin-top: 0;
+}
+
+.pkg-card:hover {
+  background: color-mix(in srgb, var(--ds-surface) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pkg-card {
+    transition: none;
+  }
+}
+
+.pkg-card h3 {
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+  color: var(--sl-color-white);
+  overflow-wrap: anywhere;
+}
+
+.pkg-card p {
+  margin: 0;
+  /* 説明文が伸びてもタグとリンクが下端に揃うよう、余りをここで吸わせる。 */
+  flex: 1;
+  font-size: 0.88rem;
+  line-height: 1.65;
+  color: var(--ds-text-dim);
+}
+
+.pkg-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pkg-tag {
+  padding: 0.14rem 0.45rem;
+  border: 1px solid var(--dz-line);
+  border-radius: var(--radius-xs, 0.25rem);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--ds-text-dim);
+}
+
+/* 「依存ゼロ」だけは色で立てる。DS の装飾グリーンは文字でも基準を満たす値。 */
+.pkg-tag[data-kind="zero-deps"] {
+  color: var(--ds-decor-1);
+  border-color: color-mix(in srgb, var(--ds-decor-1) 40%, transparent);
+}
+
+.pkg-links {
+  display: flex;
+  gap: 1rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+}
+
+.pkg-links a {
+  color: var(--ds-accent-soft);
+}
+
+/* 依存の向きを一行で示す注記。 */
+.dep-note {
+  margin-top: 1.75rem;
+  font-size: 0.86rem;
+  line-height: 1.8;
+  color: var(--ds-text-faint);
+}
+
+.dep-note code {
+  overflow-wrap: anywhere;
+}
