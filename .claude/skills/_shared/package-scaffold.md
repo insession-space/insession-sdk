@@ -21,6 +21,26 @@ packages/<name>/
 
 `pnpm-workspace.yaml` は `packages/*` を拾うので**追記不要**。`CHANGELOG.md` は Changesets が採番時に自動生成するので手で作らない。
 
+### ⚠ 状態機械は `index.ts` に全部書かない
+
+`ws-resilient-transport` のような小さいランタイムは1ファイルでよいが、**状態機械（`extension-*`）は最初からモジュールに分ける**。`extension-*` の4本はいずれも単一 `index.ts` が 500〜1200行まで育ってから分割し直した経緯がある。**後から割るほうが高くつく**ので最初から分ける:
+
+```
+packages/<name>/
+  index.ts          # 公開面の再エクスポートだけ。tsup の entry もこれ
+  types.ts          # wire / state の型。ランタイムを一切持たない
+  sanitize.ts       # 信頼できない入力の正規化と上限。wire と storage の両境界で共有する
+  state.ts          # defaultState と、状態そのものに閉じた遷移
+  reduce.ts         # action 境界。effect 記述子もここで組み立てる
+  extension.ts      # @insession/space 向けの梱包（<name>Extension）
+```
+
+- **`index.ts` は「公開面の一覧」に徹する。** 実装を置かず、すべて `export { ... } from './x.ts'` にする。何が import できるかが1画面で読め、モジュール間のコードの移動が公開 API に漏れない
+- **`types.ts` にランタイムを置かない。** 型だけにしておけば、他のどのモジュールからも初期化順を気にせず import できる
+- サブドメインが独立しているならもう1本足してよい（`extension-whiteboard/relay.ts` = お絵かき伝言ゲーム、`extension-watch-party/playback.ts` = 再生位置とキュー送り）。**逆に、境界が無いのに機械的に6ファイルへ割らないこと**
+- 永続化が両方向とも重いなら `persist.ts` に分ける（`extension-pomodoro`）。ファクトリの戻り値に `restore` が含まれるだけなら `reduce.ts` に同居させる（他の3本）
+- **テストは `index.test.ts` から `./index.ts` を import したままにする。** 内部モジュールを直接叩くと、公開面を通らない経路にテストが付いてしまう
+
 ## 2. `package.json`
 
 `packages/ws-resilient-transport/package.json` をコピーして名前・説明・keywords・`repository.directory` を差し替える。**触ってはいけないフィールド**:
