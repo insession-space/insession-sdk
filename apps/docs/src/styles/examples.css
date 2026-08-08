@@ -5,9 +5,11 @@
  * スタイルも1枚で共有する。
  */
 
+/* 枠の語彙（罫線1本・角丸・面の切り方）は site.css の `--dz-line` / `--radius-md` に合わせる。
+ * デモだけ別の角丸・別の線色にすると、同じページの中で2つの意匠が同居して見える。 */
 .demo {
-  border: 1px solid var(--ds-border);
-  border-radius: 0.9rem;
+  border: 1px solid var(--dz-line);
+  border-radius: var(--radius-md, 0.5rem);
   background: var(--ds-bg-elevated);
   overflow: hidden;
   margin-top: 1.5rem;
@@ -19,7 +21,7 @@
   align-items: baseline;
   gap: 0.5rem 0.9rem;
   padding: 0.7rem 1.1rem;
-  border-bottom: 1px solid var(--ds-border);
+  border-bottom: 1px solid var(--dz-line);
   background: var(--ds-surface);
   font-family: var(--__sl-font-mono, ui-monospace, monospace);
   font-size: 0.8rem;
@@ -34,7 +36,7 @@
 .demo-body {
   display: grid;
   gap: 1px;
-  background: var(--ds-border);
+  background: var(--dz-line);
   grid-template-columns: 1fr;
 }
 
@@ -142,7 +144,7 @@
 
 .demo-trace li {
   padding: 0.28rem 0;
-  border-bottom: 1px dashed var(--ds-border);
+  border-bottom: 1px dashed var(--dz-line);
   color: var(--ds-text-dim);
   overflow-wrap: anywhere;
 }
@@ -189,8 +191,8 @@
 .space-screen {
   display: grid;
   gap: 1px;
-  background: var(--ds-border);
-  border-top: 1px solid var(--ds-border);
+  background: var(--dz-line);
+  border-top: 1px solid var(--dz-line);
   grid-template-columns: 1fr;
   grid-template-areas:
     "rail"
@@ -242,8 +244,8 @@
   flex-direction: column;
   gap: 0.15rem;
   padding: 0.4rem 0.6rem;
-  border: 1px solid var(--ds-border);
-  border-radius: 0.6rem;
+  border: 1px solid var(--dz-line);
+  border-radius: var(--radius-sm, 0.4rem);
   font-family: var(--__sl-font-mono, ui-monospace, monospace);
 }
 

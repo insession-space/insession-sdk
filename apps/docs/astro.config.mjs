@@ -52,9 +52,13 @@ export default defineConfig({
       // ⚠ `theme.css` / `components.css` は**使わない**。あれは Tailwind v4 を持つ消費側専用で、
       // 素の `@theme {}` を含む Tailwind ソースなので、Astro にそのまま食わせても変数が出力されない。
       // Tailwind を持たないこのサイトが読むべきなのはプリビルド済みの `styles.css` だけ。
+      //
+      // 内訳: DS（トークンの値）→ tokens（Starlight 変数への橋渡し）→ site（サイト全体の意匠）
+      // → examples（デモページ固有）。**後ろほど強い**ので、固有のものを後ろに置く。
       customCss: [
         '@insession/design-system/styles.css',
         './src/styles/tokens.css',
+        './src/styles/site.css',
         './src/styles/examples.css',
       ],
       editLink: { baseUrl: `${REPO}/edit/main/apps/docs/` },
