@@ -1,8 +1,8 @@
-// reduceSpace（use-space.ts の handleCoreMessage の移植）の回帰テスト（#1713）。
-// 「主要 msg.type の畳み込みに回帰テストがある」という受け入れ条件を満たすための固定テスト。
-// #1720 step6: 各スペースアプリ固有のテストは対応する plugin パッケージの client.test.ts へ
-// 移設した。ここに残すのは plugin 非依存の core の挙動(plugin 記述子が無くても apps は
-// 格納される・PluginClient を渡したときに pluginLocal/lines/effects が反映される)だけ。
+// reduceSpace の回帰テスト。主要な msg.type それぞれの畳み込みを固定する。
+//
+// extension 固有の振る舞いはここでは扱わない（各 extension パッケージのテストが持つ）。
+// ここが見るのは extension に依存しない core の挙動だけ — PluginClient を1つも渡さなくても
+// apps へ格納されること、渡したときに pluginLocal / lines / effects が反映されること。
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { resetConnection } from './actions.ts';
@@ -182,7 +182,17 @@ describe('reduceSpace', () => {
     it('clientMsgId 一致行に id と createdAt を反映する', () => {
       const state = {
         ...initialSpaceState(),
-        chatLines: [{ key: 1, clientMsgId: 'c1', id: null, createdAt: 1 }],
+        chatLines: [
+          {
+            key: 1,
+            kind: 'chat' as const,
+            name: 'Alice',
+            text: 'hi',
+            clientMsgId: 'c1',
+            id: null,
+            createdAt: 1,
+          },
+        ],
       };
       const msg = { type: 'chat-ack', clientMsgId: 'c1', id: 99, createdAt: 12345 };
       const { state: next } = reduceSpace(state, msg, makeCtx());
@@ -195,7 +205,9 @@ describe('reduceSpace', () => {
     it('reactedByMe が selfName から導出される', () => {
       const state = {
         ...initialSpaceState(),
-        chatLines: [{ key: 1, id: 5, reactions: {} }],
+        chatLines: [
+          { key: 1, kind: 'chat' as const, name: 'Bob', text: 'hi', id: 5, reactions: {} },
+        ],
       };
       const msg = {
         type: 'chat-reaction-update',
@@ -431,9 +443,8 @@ describe('reduceSpace', () => {
   });
 });
 
-// 旧実装では endedAgentRuns（終了済み実行の印。#1589）が use-space.ts の素の ref で、
-// 接続 useEffect のクリーンアップごとに .clear() されていた。store へ移した際に同じ寿命を
-// 保てているかを固定する（落とすと、表示名を変えて張り直したときだけ印が持ち越される）。
+// endedAgentRuns（終了済み実行の印）は接続と同じ寿命でなければならない。ここを落とすと、
+// 表示名を変えて接続を張り直したときだけ印が持ち越され、そのときだけ挙動が変わる。
 describe('resetConnection', () => {
   it('connected を戻し endedAgentRuns も捨てる', () => {
     const state = { ...initialSpaceState(), connected: true, endedAgentRuns: ['req-1'] };

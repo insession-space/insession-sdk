@@ -1,35 +1,49 @@
-// store / 消費者から呼ぶ、受信メッセージ以外の純粋な state 遷移（#1713）。
-// いずれも (state, ...) => SpaceState の形で、reduce.ts と同じく副作用を持たない。
-import { pushChatLine } from './chat-lines.ts';
+// State transitions that do not come from a received message: a locally
+// echoed message, an optimistic reaction, a timer firing, a reconnect.
+//
+// Same shape and same discipline as the reducer — `(state, ...) => SpaceState`,
+// with no side effects.
+
+import { type ChatLineInput, pushChatLine } from './chat-lines.ts';
 import type { SpaceState } from './state.ts';
 
-// ローカルなシステム行/チャット行の追加。use-space.ts の addChatLine 相当（key 採番 + 200行トリム）。
-export function addChatLine(state: SpaceState, line: any): SpaceState {
+/** Adds a line the consumer composed itself (a local system notice). */
+export function addChatLine(state: SpaceState, line: ChatLineInput): SpaceState {
   return pushChatLine(state, line);
 }
 
-// チャット送信(sendChat)/スタンプ送信(sendSticker)のローカルエコー(#236)。サーバーは送信者を
-// 除外してブロードキャストするため、送信と同時に自分の画面へ即時反映する（往復待ちの遅延をなくす）。
-// 中身は addChatLine と同じだが、呼び出し意図（受信ではなく自分の送信起因）を名前で区別する。
-export function appendLocalChat(state: SpaceState, line: any): SpaceState {
+/**
+ * Echoes a message this client just sent. The server broadcasts to everyone
+ * *except* the sender, so without this the sender would watch their own
+ * message take a round trip to appear.
+ *
+ * Identical to `addChatLine` in what it does; separate so the call site says
+ * which of the two situations it is.
+ */
+export function appendLocalChat(state: SpaceState, line: ChatLineInput): SpaceState {
   return pushChatLine(state, line);
 }
 
-// メッセージへの絵文字リアクションをトグルする(#236)。sendChatReaction 内の楽観更新(#1089)を
-// そのまま移植したもの。サーバーの chat-reaction-update（全量上書き）が後着で authoritative に
-// 収束するので、ここでの見た目のズレは一時的なもので構わない。
+/**
+ * Toggles a reaction optimistically.
+ *
+ * The server's own reaction update overwrites the whole set when it arrives,
+ * so any disagreement here is momentary and self-correcting. `names` is
+ * updated too, not just the count, so that a "who reacted" tooltip stays
+ * consistent in the meantime.
+ */
 export function toggleReactionLocally(
   state: SpaceState,
   messageId: number,
   emoji: string,
   selfName: string,
 ): SpaceState {
-  const chatLines = state.chatLines.map((line: any) => {
-    if (line.id !== messageId) return line;
+  const chatLines = state.chatLines.map((line) => {
+    // The `kind` check is what makes `reactions` below well-typed: only a chat
+    // message carries them. A log line has no storage id to match on anyway.
+    if (line.kind !== 'chat' || line.id !== messageId) return line;
     const reactions = { ...(line.reactions ?? {}) };
     const cur = reactions[emoji];
-    // names も楽観更新する(#1336 の「誰が押したか」表示が即時に整合するように)。
-    // 後着の chat-reaction-update(全量上書き)で最終的に authoritative へ収束する。
     const curNames: string[] = cur?.names ?? [];
     if (cur?.reactedByMe) {
       if (cur.count <= 1) delete reactions[emoji];
@@ -51,16 +65,22 @@ export function toggleReactionLocally(
   return { ...state, chatLines };
 }
 
-// 入力中表示を即時解除する(メッセージ送信時。3秒の自動クリアを待たない)。同名の呼び出し側
-// タイマー(typing-timer effect)の破棄は消費者側の責務（state はここでは持たない）。
+/**
+ * Drops somebody's typing indicator immediately, without waiting out the
+ * three seconds. Cancelling the timer itself is the consumer's job — the
+ * reducer emits a `typing-timer-clear` effect for it.
+ */
 export function clearTyping(state: SpaceState, name: string): SpaceState {
   if (!state.typingUsers.includes(name)) return state;
   return { ...state, typingUsers: state.typingUsers.filter((n) => n !== name) };
 }
 
-// AI Agent 実況の取りこぼし保険タイマーが発火したときに呼ぶ（#1589）。
-// ⚠ この agent の「今の実行」でなければ無視する。実行A→実行Bと続いたとき、遅れて発火した
-//   Aのタイマーが B の実況を消してしまうのを防ぐ（requestId の一致を見るのが本題）。
+/**
+ * Called when the backstop timer for an agent run fires.
+ *
+ * ⚠ Ignores the call unless this is still that agent's current run. With run A
+ *   followed by run B, a late timer from A would otherwise clear B's status.
+ */
 export function expireAgentStatus(
   state: SpaceState,
   agentId: string,
@@ -72,12 +92,14 @@ export function expireAgentStatus(
   return { ...state, agentStatuses };
 }
 
-// マウント時のリセット相当。再接続前に「まだ接続確立していない」状態へ戻す。
-//
-// ⚠ endedAgentRuns（終了済み実行の印。#1589）もここで捨てる。旧実装ではこの印が
-//   use-space.ts の素の ref で、接続 useEffect のクリーンアップ（spaceId/name の変更）ごとに
-//   .clear() されていた。store へ移した際に捨て忘れると、表示名を変えて張り直したときだけ
-//   印が持ち越されて挙動が変わる。connected と同じ寿命に揃えることで旧実装と一致させる（#1713）。
+/**
+ * Back to "not connected yet", for a reconnect.
+ *
+ * ⚠ `endedAgentRuns` is discarded here too. It has the same lifetime as the
+ *   connection: keeping it across a reconnect would make the store behave
+ *   differently depending on whether the connection was torn down, which is
+ *   exactly the kind of difference nobody would think to look for.
+ */
 export function resetConnection(state: SpaceState): SpaceState {
   if (!state.connected && state.endedAgentRuns.length === 0) return state;
   return { ...state, connected: false, endedAgentRuns: [] };

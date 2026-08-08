@@ -1,13 +1,25 @@
-// サーバーが配る生のリアクション集約({emoji: {count, names}})を、自分の name で
-// reactedByMe を導出した表示用の形({emoji: {count, reactedByMe, names}})に変換する(#236)。
-// names は「誰が押したか」のホバー表示(#1336)に使うので落とさず持ち越す。
-// use-space.ts の toReactionsView を transport 非依存の純関数として移植したもの。
-// @in-session/protocol には依存しない。汎用 SDK 側の最小定義は ./types.ts 参照。
+// Turning the server's shared reaction summary into the per-viewer shape a UI
+// needs.
+//
+// The server broadcasts one value to everyone (`{ emoji: { count, names } }`)
+// rather than a different one per recipient, so "did I react?" has to be
+// derived on each client. `names` is carried through rather than discarded —
+// it is what lets a UI show *who* reacted.
+
 import type { ChatReactionSummary } from './types.ts';
 
-export function toReactionsView(raw: ChatReactionSummary | undefined, selfName: string) {
+/** One message's reactions, as a viewer sees them. */
+export type ChatReactionsView = Record<
+  string,
+  { count: number; reactedByMe: boolean; names: string[] }
+>;
+
+export function toReactionsView(
+  raw: ChatReactionSummary | undefined,
+  selfName: string,
+): ChatReactionsView {
   if (!raw) return {};
-  const view: Record<string, { count: number; reactedByMe: boolean; names: string[] }> = {};
+  const view: ChatReactionsView = {};
   for (const [emoji, data] of Object.entries(raw)) {
     view[emoji] = {
       count: data.count,
