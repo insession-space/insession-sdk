@@ -1,5 +1,12 @@
 # @insession/docs
 
+## 0.0.12
+
+### Patch Changes
+
+- Updated dependencies [cbe9d07]
+  - @insession/space-state@0.3.1
+
 ## 0.0.11
 
 ### Patch Changes
