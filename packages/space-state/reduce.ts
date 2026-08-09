@@ -87,7 +87,7 @@ export function reduceSpace(
     case 'chat-reaction-update':
       return onChatReactionUpdate(state, msg, ctx);
     case 'message-pinned':
-      return onMessagePinned(state, msg, ctx);
+      return onMessagePinned(state, msg);
     case 'app-state':
       return onAppState(state, msg, ctx);
     case 'app-relay':

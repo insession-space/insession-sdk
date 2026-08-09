@@ -121,19 +121,14 @@ export function onChatReactionUpdate(
   return { state: { ...state, chatLines }, effects: [] };
 }
 
-export function onMessagePinned(
-  state: SpaceState,
-  msg: MessagePinnedMessage,
-  ctx: ReduceCtx,
-): ReduceResult {
-  let next: SpaceState = { ...state, pinnedMessage: msg.pinned || null };
-  next = pushChatLine(next, {
-    kind: 'log',
-    icon: 'push_pin',
-    by: msg.by,
-    text: msg.pinned ? ctx.t('log.messagePinned') : ctx.t('log.messageUnpinned'),
-  });
-  return { state: next, effects: [] };
+/**
+ * Pinning is its own surface: the pinned message stays on screen for as long as
+ * it is pinned, so a log line announcing it would only restate what the surface
+ * already shows — and push the conversation up while doing so. The state change
+ * is the whole point here; no chat line is written.
+ */
+export function onMessagePinned(state: SpaceState, msg: MessagePinnedMessage): ReduceResult {
+  return { state: { ...state, pinnedMessage: msg.pinned || null }, effects: [] };
 }
 
 /**
