@@ -76,10 +76,6 @@ const LABELS: Record<string, string> = {
   'log.pomodoro.paused': 'timer paused',
   'log.whiteboard.cleared': 'cleared the board',
   'log.whiteboardSwitch': 'switched to the whiteboard',
-  // ⚠ ピン留めのログ行は core（space-state）が出す。plugin の分だけ埋めても
-  // `<log.messagePinned>` が画面に出るので、core が引くキーも揃えること。
-  'log.messagePinned': 'pinned a message',
-  'log.messageUnpinned': 'removed the pin',
 };
 
 const t = (key: string) => LABELS[key] ?? `<${key}>`;

@@ -221,6 +221,30 @@ describe('reduceSpace', () => {
     });
   });
 
+  describe('message-pinned', () => {
+    it('pinnedMessage を置換するだけで、ログ行も effect も出さない', () => {
+      const pinned = { id: 5, name: 'Bob', text: 'hi', kind: 'chat' };
+      const { state: pinnedState, effects: pinEffects } = reduceSpace(
+        initialSpaceState(),
+        { type: 'message-pinned', pinned, by: 'Bob' },
+        makeCtx(),
+      );
+      assert.deepEqual(pinnedState.pinnedMessage, pinned);
+      // ピン留めは固定表示そのものが結果を示すので、チャットにログ行を積まない。
+      assert.equal(pinnedState.chatLines.length, 0);
+      assert.equal(pinEffects.length, 0);
+
+      const { state: unpinned, effects: unpinEffects } = reduceSpace(
+        pinnedState,
+        { type: 'message-pinned', pinned: null, by: 'Bob' },
+        makeCtx(),
+      );
+      assert.equal(unpinned.pinnedMessage, null);
+      assert.equal(unpinned.chatLines.length, 0);
+      assert.equal(unpinEffects.length, 0);
+    });
+  });
+
   describe('app-state (plugin 非依存の core 挙動)', () => {
     it('plugin 記述子を1つも渡さなくても apps[appId] は最新値で置換される', () => {
       const msg = {
