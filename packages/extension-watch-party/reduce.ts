@@ -13,6 +13,7 @@ import {
 } from './playback.ts';
 import {
   DEFAULT_MAX_QUEUE,
+  isExternalMediaProvider,
   isValidMediaId,
   MAX_HISTORY,
   MAX_SOUNDCLOUD_ID_LEN,
@@ -92,14 +93,15 @@ export function createWatchParty(options: CreateWatchPartyOptions = {}): WatchPa
         const provider = providerOf(payload?.provider);
         const videoId = str(payload?.videoId, mediaIdMaxLen(provider));
         if (!isValidMediaId(provider, videoId)) return null;
-        const mediaUrl =
-          provider === 'soundcloud' ? str(payload?.mediaUrl, MAX_URL_LEN) || null : null;
-        if (provider === 'soundcloud' && !mediaUrl) {
-          // A SoundCloud item without a resolvable media URL can never be played
-          // back, and persisting it would leave the room stuck on something
-          // broken after a restore. Reject it — and tell the sender why, using
-          // the same reason `queue-add` reports, so a failed load is visible
-          // rather than looking like the click did nothing.
+        const mediaUrl = isExternalMediaProvider(provider)
+          ? str(payload?.mediaUrl, MAX_URL_LEN) || null
+          : null;
+        if (isExternalMediaProvider(provider) && !mediaUrl) {
+          // A SoundCloud/podcast item without a resolvable media URL can never
+          // be played back, and persisting it would leave the room stuck on
+          // something broken after a restore. Reject it — and tell the sender
+          // why, using the same reason `queue-add` reports, so a failed load
+          // is visible rather than looking like the click did nothing.
           return {
             state: s,
             effects: [
@@ -111,7 +113,7 @@ export function createWatchParty(options: CreateWatchPartyOptions = {}): WatchPa
           };
         }
         const thumbnail =
-          provider === 'soundcloud' && typeof payload?.thumbnail === 'string'
+          isExternalMediaProvider(provider) && typeof payload?.thumbnail === 'string'
             ? str(payload.thumbnail, MAX_URL_LEN)
             : null;
         const title = typeof payload?.title === 'string' ? str(payload.title, MAX_TITLE_LEN) : null;
@@ -272,11 +274,13 @@ export function createWatchParty(options: CreateWatchPartyOptions = {}): WatchPa
           if (mine >= payload.maxPerUser)
             return rejectQueueAdd(s, 'max-per-user', payload.maxPerUser);
         }
-        const mediaUrl =
-          provider === 'soundcloud' ? str(payload?.mediaUrl, MAX_URL_LEN) || null : null;
-        if (provider === 'soundcloud' && !mediaUrl) return rejectQueueAdd(s, 'invalid-media-url');
+        const mediaUrl = isExternalMediaProvider(provider)
+          ? str(payload?.mediaUrl, MAX_URL_LEN) || null
+          : null;
+        if (isExternalMediaProvider(provider) && !mediaUrl)
+          return rejectQueueAdd(s, 'invalid-media-url');
         const thumbnail =
-          provider === 'soundcloud' && typeof payload?.thumbnail === 'string'
+          isExternalMediaProvider(provider) && typeof payload?.thumbnail === 'string'
             ? str(payload.thumbnail, MAX_URL_LEN)
             : null;
         const givenTitle =
