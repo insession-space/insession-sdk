@@ -132,6 +132,50 @@ test('load-video: soundcloud with a mediaUrl is accepted', () => {
   assert.equal(result?.state.mediaUrl, 'https://soundcloud.com/artist/track');
 });
 
+// A `providerOf`/`isValidMediaId` regression the app hit in the wild (#2039):
+// before podcast support existed here, an unrecognized `provider` string fell
+// through to the YouTube branch, so a podcast episode id (which never matches
+// YouTube's 11-char `[\w-]` shape) was silently rejected as an invalid
+// videoId — no error, no `queue-rejected`, just nothing happening.
+test('load-video: podcast without a mediaUrl is rejected', () => {
+  const initial = defaultState();
+  const out = wp.reduce(initial, 'load-video', {
+    provider: 'podcast',
+    videoId: 'podcast-0a1b2c3d-4e5f6a7b',
+  });
+  // Rejected, but not silently: nothing enters state and the sender is told why.
+  assert.ok(out);
+  assert.deepEqual(out.state, initial);
+  assert.deepEqual(out.effects, [
+    { type: 'send-to-sender', message: { type: 'queue-rejected', reason: 'invalid-media-url' } },
+  ]);
+});
+
+test('load-video: podcast with a mediaUrl is accepted', () => {
+  const result = wp.reduce(defaultState(), 'load-video', {
+    provider: 'podcast',
+    videoId: 'podcast-0a1b2c3d-4e5f6a7b',
+    mediaUrl: 'https://example.com/episode.mp3',
+    thumbnail: 'https://example.com/episode.jpg',
+  });
+  assert.ok(result);
+  assert.equal(result?.state.provider, 'podcast');
+  assert.equal(result?.state.videoId, 'podcast-0a1b2c3d-4e5f6a7b');
+  assert.equal(result?.state.mediaUrl, 'https://example.com/episode.mp3');
+  assert.equal(result?.state.thumbnail, 'https://example.com/episode.jpg');
+});
+
+test('load-video: rejects a podcast id in the wrong shape (e.g. a bare YouTube-length id)', () => {
+  assert.equal(
+    wp.reduce(defaultState(), 'load-video', {
+      provider: 'podcast',
+      videoId: 'notarealpo',
+      mediaUrl: 'https://example.com/episode.mp3',
+    }),
+    null,
+  );
+});
+
 // --- play / pause / seek -----------------------------------------------------
 
 test('play: invalid/missing position keeps the current (extrapolated) position but sets isPlaying true', () => {
@@ -856,6 +900,76 @@ test('queue-add: each rejection tells the sender why', () => {
   assert.deepEqual(broken.effects, [
     { type: 'send-to-sender', message: { type: 'queue-rejected', reason: 'invalid-media-url' } },
   ]);
+
+  // Podcast without a media URL — same rejection path (#2039 regression).
+  const brokenPodcast = wp.reduce(playing, 'queue-add', {
+    provider: 'podcast',
+    videoId: 'podcast-0a1b2c3d-4e5f6a7b',
+    addedBy: 'alice',
+  });
+  assert.ok(brokenPodcast);
+  assert.deepEqual(brokenPodcast.effects, [
+    { type: 'send-to-sender', message: { type: 'queue-rejected', reason: 'invalid-media-url' } },
+  ]);
+});
+
+// #2039: a podcast episode must be able to go all the way through `queue-add`
+// — accepted into the queue, broadcast, and (since nothing was playing)
+// auto-played — the same as a YouTube/SoundCloud item. Before podcast support
+// existed here, `isValidMediaId` always tested podcast pseudo-ids against
+// YouTube's 11-char regex, so this add would have silently returned `null`.
+test('queue-add: a podcast episode is accepted into the queue and auto-plays', () => {
+  const wp = createWatchParty();
+  const result = wp.reduce(wp.defaultState(), 'queue-add', {
+    provider: 'podcast',
+    videoId: 'podcast-0a1b2c3d-4e5f6a7b',
+    mediaUrl: 'https://example.com/episode.mp3',
+    thumbnail: 'https://example.com/episode.jpg',
+    title: 'Episode 1',
+    durationSec: 1800,
+    addedBy: 'alice',
+  });
+  assert.ok(result, 'the podcast episode must not be silently rejected');
+  // Nothing was playing, so `queue-add` auto-advances into it immediately —
+  // it never lands in the queue array itself.
+  assert.equal(result.state.queue.length, 0);
+  assert.equal(result.state.videoId, 'podcast-0a1b2c3d-4e5f6a7b');
+  assert.equal(result.state.provider, 'podcast');
+  assert.equal(result.state.mediaUrl, 'https://example.com/episode.mp3');
+  assert.equal(result.state.thumbnail, 'https://example.com/episode.jpg');
+  assert.equal(result.state.isPlaying, true);
+  assert.equal(result.state.history[0]?.videoId, 'podcast-0a1b2c3d-4e5f6a7b');
+  assert.equal(result.state.history[0]?.provider, 'podcast');
+
+  const queueUpdate = findBroadcast(effectsOf(result), 'queue-update');
+  assert.ok(queueUpdate, 'queue-add must broadcast a queue-update even when it immediately drains');
+  const loadMsg = findBroadcast(effectsOf(result), 'load-video');
+  assert.ok(loadMsg, 'auto-play must broadcast load-video for the podcast episode');
+});
+
+// A second podcast episode added while one is already playing must land (and
+// stay) in the queue rather than auto-playing over the current one.
+test('queue-add: a second podcast episode queues behind the one already playing', () => {
+  const wp = createWatchParty();
+  const playing = wp.reduce(wp.defaultState(), 'queue-add', {
+    provider: 'podcast',
+    videoId: 'podcast-0a1b2c3d-4e5f6a7b',
+    mediaUrl: 'https://example.com/episode-1.mp3',
+    addedBy: 'alice',
+  })!.state;
+  const result = wp.reduce(playing, 'queue-add', {
+    provider: 'podcast',
+    videoId: 'podcast-11111111-22222222',
+    mediaUrl: 'https://example.com/episode-2.mp3',
+    addedBy: 'alice',
+  });
+  assert.ok(result);
+  assert.equal(result.state.queue.length, 1);
+  assert.equal(result.state.queue[0]?.videoId, 'podcast-11111111-22222222');
+  assert.equal(result.state.queue[0]?.provider, 'podcast');
+  assert.equal(result.state.queue[0]?.mediaUrl, 'https://example.com/episode-2.mp3');
+  // The currently-playing episode is untouched.
+  assert.equal(result.state.videoId, 'podcast-0a1b2c3d-4e5f6a7b');
 });
 
 // A host that awaits before calling `reduce` must be able to stamp arrival

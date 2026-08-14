@@ -5,7 +5,7 @@
 // them.
 
 /** Which backend the "now playing" item and each queue/history item came from. */
-export type WatchPartyProvider = 'youtube' | 'soundcloud';
+export type WatchPartyProvider = 'youtube' | 'soundcloud' | 'podcast';
 
 /** One item waiting to be played. */
 export interface WatchPartyQueueItem {
@@ -13,9 +13,9 @@ export interface WatchPartyQueueItem {
   uid: string;
   videoId: string;
   provider: WatchPartyProvider;
-  /** SoundCloud's permalink URL. `null` for YouTube (unused there). */
+  /** SoundCloud's permalink URL, or the podcast episode's audio URL. `null` for YouTube (unused there). */
   mediaUrl: string | null;
-  /** SoundCloud's artwork URL. `null` for YouTube (the client derives a thumbnail from `videoId`). */
+  /** SoundCloud's/the podcast episode's artwork URL. `null` for YouTube (the client derives a thumbnail from `videoId`). */
   thumbnail: string | null;
   /** `null` until resolved — see the `queue-add`/`resolve-metadata` flow in the module doc. */
   title: string | null;
@@ -96,11 +96,11 @@ export type WatchPartyAction =
 export interface WatchPartyPayload {
   /** `load-video`/`queue-add`: defaults to `'youtube'` if omitted/invalid. */
   provider?: unknown;
-  /** `load-video`/`queue-add`: the video/track id (YouTube id or SoundCloud pseudo-id). */
+  /** `load-video`/`queue-add`: the video/track/episode id (YouTube id, SoundCloud pseudo-id, or podcast pseudo-id). */
   videoId?: unknown;
-  /** `load-video`/`queue-add` (SoundCloud only): the permalink URL. */
+  /** `load-video`/`queue-add` (SoundCloud/podcast only): the permalink/audio URL. */
   mediaUrl?: unknown;
-  /** `load-video`/`queue-add` (SoundCloud only): the artwork URL. */
+  /** `load-video`/`queue-add` (SoundCloud/podcast only): the artwork URL. */
   thumbnail?: unknown;
   /** `load-video`/`queue-add`: title, if already known (skips the `resolve-metadata` round trip). */
   title?: unknown;

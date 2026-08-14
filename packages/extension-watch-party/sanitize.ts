@@ -12,6 +12,7 @@ export const DEFAULT_MAX_QUEUE = 50;
 export const MAX_HISTORY = 50;
 export const MAX_YOUTUBE_ID_LEN = 20; // Actual YouTube ids are 11 chars; this is just a pre-regex safety net.
 export const MAX_SOUNDCLOUD_ID_LEN = 160;
+export const MAX_PODCAST_ID_LEN = 40; // `podcast-<8 hex>-<8 hex>` is 26 chars; this is just a pre-regex safety net.
 export const MAX_TITLE_LEN = 200;
 export const MAX_URL_LEN = 500;
 const MAX_NAME_LEN = 100;
@@ -27,10 +28,16 @@ const VIDEO_ID_RE = /^[\w-]{11}$/;
 // own doc comment for the encoding). Same reasoning as above: this is a
 // stable id-shape convention, not app policy, so it's encoded directly here.
 const SOUNDCLOUD_ID_RE = /^sc-(track|set)-[\w./-]{1,128}$/;
+// Podcasts have no single public id either — the app that ported this module
+// represents an episode with a pseudo-id of this shape (`podcast-<feed
+// hash>-<episode hash>`, both 8 hex chars). Same reasoning as above.
+const PODCAST_ID_RE = /^podcast-[0-9a-f]{8}-[0-9a-f]{8}$/;
 
 export function isValidMediaId(provider: WatchPartyProvider, id: unknown): id is string {
   if (typeof id !== 'string' || !id) return false;
-  return provider === 'soundcloud' ? SOUNDCLOUD_ID_RE.test(id) : VIDEO_ID_RE.test(id);
+  if (provider === 'soundcloud') return SOUNDCLOUD_ID_RE.test(id);
+  if (provider === 'podcast') return PODCAST_ID_RE.test(id);
+  return VIDEO_ID_RE.test(id);
 }
 
 export function str(v: unknown, max: number): string {
@@ -45,12 +52,24 @@ export function normName(v: unknown): string | null {
 }
 
 export function providerOf(v: unknown): WatchPartyProvider {
-  return v === 'soundcloud' ? 'soundcloud' : 'youtube';
+  if (v === 'soundcloud') return 'soundcloud';
+  if (v === 'podcast') return 'podcast';
+  return 'youtube';
+}
+
+// SoundCloud and podcast items both carry a host-provided `mediaUrl` the
+// player plays directly, rather than a provider-native id the client resolves
+// itself (as YouTube's embed does from `videoId`) — see `reduce.ts`'s
+// `load-video`/`queue-add` handling.
+export function isExternalMediaProvider(provider: WatchPartyProvider): boolean {
+  return provider === 'soundcloud' || provider === 'podcast';
 }
 
 /** The id-length cap that applies to `provider`'s ids. */
 export function mediaIdMaxLen(provider: WatchPartyProvider): number {
-  return provider === 'soundcloud' ? MAX_SOUNDCLOUD_ID_LEN : MAX_YOUTUBE_ID_LEN;
+  if (provider === 'soundcloud') return MAX_SOUNDCLOUD_ID_LEN;
+  if (provider === 'podcast') return MAX_PODCAST_ID_LEN;
+  return MAX_YOUTUBE_ID_LEN;
 }
 
 // Non-negative integer seconds, or `null` for anything else (missing,
