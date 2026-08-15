@@ -5,7 +5,7 @@
 // them.
 
 /** Which backend the "now playing" item and each queue/history item came from. */
-export type WatchPartyProvider = 'youtube' | 'soundcloud' | 'podcast';
+export type WatchPartyProvider = 'youtube' | 'soundcloud' | 'podcast' | 'spotify';
 
 /** One item waiting to be played. */
 export interface WatchPartyQueueItem {

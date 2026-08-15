@@ -13,6 +13,7 @@ export const MAX_HISTORY = 50;
 export const MAX_YOUTUBE_ID_LEN = 20; // Actual YouTube ids are 11 chars; this is just a pre-regex safety net.
 export const MAX_SOUNDCLOUD_ID_LEN = 160;
 export const MAX_PODCAST_ID_LEN = 40; // `podcast-<8 hex>-<8 hex>` is 26 chars; this is just a pre-regex safety net.
+export const MAX_SPOTIFY_ID_LEN = 40; // `spotify-episode-<22 chars>` is 38 chars; this is just a pre-regex safety net.
 export const MAX_TITLE_LEN = 200;
 export const MAX_URL_LEN = 500;
 const MAX_NAME_LEN = 100;
@@ -32,11 +33,17 @@ const SOUNDCLOUD_ID_RE = /^sc-(track|set)-[\w./-]{1,128}$/;
 // represents an episode with a pseudo-id of this shape (`podcast-<feed
 // hash>-<episode hash>`, both 8 hex chars). Same reasoning as above.
 const PODCAST_ID_RE = /^podcast-[0-9a-f]{8}-[0-9a-f]{8}$/;
+// Spotify episode ids are base62 and always 22 chars — a stable, public fact
+// about Spotify's id format. The app that ported this module prefixes them so
+// the shape alone identifies the provider (a bare 22-char id would otherwise be
+// indistinguishable from other opaque ids). Same reasoning as above.
+const SPOTIFY_ID_RE = /^spotify-episode-[A-Za-z0-9]{22}$/;
 
 export function isValidMediaId(provider: WatchPartyProvider, id: unknown): id is string {
   if (typeof id !== 'string' || !id) return false;
   if (provider === 'soundcloud') return SOUNDCLOUD_ID_RE.test(id);
   if (provider === 'podcast') return PODCAST_ID_RE.test(id);
+  if (provider === 'spotify') return SPOTIFY_ID_RE.test(id);
   return VIDEO_ID_RE.test(id);
 }
 
@@ -54,21 +61,28 @@ export function normName(v: unknown): string | null {
 export function providerOf(v: unknown): WatchPartyProvider {
   if (v === 'soundcloud') return 'soundcloud';
   if (v === 'podcast') return 'podcast';
+  if (v === 'spotify') return 'spotify';
   return 'youtube';
 }
 
-// SoundCloud and podcast items both carry a host-provided `mediaUrl` the
-// player plays directly, rather than a provider-native id the client resolves
-// itself (as YouTube's embed does from `videoId`) — see `reduce.ts`'s
-// `load-video`/`queue-add` handling.
+// SoundCloud, podcast and Spotify items all carry a host-provided `mediaUrl`,
+// rather than a provider-native id the client resolves itself (as YouTube's
+// embed does from `videoId`) — see `reduce.ts`'s `load-video`/`queue-add`
+// handling.
+//
+// Note Spotify's `mediaUrl` is the episode's public page URL, kept for display
+// and outbound links: unlike SoundCloud/podcast it is not the stream the player
+// consumes (Spotify's own embed resolves that from the id). It still belongs
+// here because the field must survive sanitization for the host to use it.
 export function isExternalMediaProvider(provider: WatchPartyProvider): boolean {
-  return provider === 'soundcloud' || provider === 'podcast';
+  return provider === 'soundcloud' || provider === 'podcast' || provider === 'spotify';
 }
 
 /** The id-length cap that applies to `provider`'s ids. */
 export function mediaIdMaxLen(provider: WatchPartyProvider): number {
   if (provider === 'soundcloud') return MAX_SOUNDCLOUD_ID_LEN;
   if (provider === 'podcast') return MAX_PODCAST_ID_LEN;
+  if (provider === 'spotify') return MAX_SPOTIFY_ID_LEN;
   return MAX_YOUTUBE_ID_LEN;
 }
 
