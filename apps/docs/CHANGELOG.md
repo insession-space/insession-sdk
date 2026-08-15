@@ -1,5 +1,12 @@
 # @insession/docs
 
+## 0.0.14
+
+### Patch Changes
+
+- Updated dependencies [f9057e9]
+  - @insession/extension-watch-party@0.5.0
+
 ## 0.0.13
 
 ### Patch Changes
