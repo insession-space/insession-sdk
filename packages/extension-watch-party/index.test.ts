@@ -165,6 +165,54 @@ test('load-video: podcast with a mediaUrl is accepted', () => {
   assert.equal(result?.state.thumbnail, 'https://example.com/episode.jpg');
 });
 
+// The same `providerOf`/`isValidMediaId` regression, hit again for Spotify: the
+// consuming app added a `spotify` provider on its side only, so this module fell
+// through to the YouTube branch and rejected every `spotify-episode-<id>` as an
+// invalid videoId. The client showed "added to queue" while the queue stayed
+// empty — the exact silent failure the podcast tests above were written for.
+test('load-video: spotify with a mediaUrl is accepted', () => {
+  const result = wp.reduce(defaultState(), 'load-video', {
+    provider: 'spotify',
+    videoId: 'spotify-episode-5SIS7xmznPY2CKDoTXYNmc',
+    mediaUrl: 'https://open.spotify.com/episode/5SIS7xmznPY2CKDoTXYNmc',
+    thumbnail: 'https://image-cdn-ak.spotifycdn.com/image/abc123',
+  });
+  assert.ok(result);
+  assert.equal(result?.state.provider, 'spotify');
+  assert.equal(result?.state.videoId, 'spotify-episode-5SIS7xmznPY2CKDoTXYNmc');
+  assert.equal(result?.state.mediaUrl, 'https://open.spotify.com/episode/5SIS7xmznPY2CKDoTXYNmc');
+});
+
+test('load-video: rejects a spotify id in the wrong shape', () => {
+  // Spotify ids are base62 and exactly 22 chars; anything else is not one.
+  assert.equal(
+    wp.reduce(defaultState(), 'load-video', {
+      provider: 'spotify',
+      videoId: 'spotify-episode-tooshort',
+      mediaUrl: 'https://open.spotify.com/episode/tooshort',
+    }),
+    null,
+  );
+});
+
+test('queue-add: spotify keeps its mediaUrl through sanitization', () => {
+  // `isExternalMediaProvider` gates whether `mediaUrl` survives; without spotify
+  // in it the host loses the episode URL it needs for display/outbound links.
+  // Something must already be playing, otherwise `queue-add` auto-plays the item
+  // and pops it straight back off the queue (see the auto-play tests below).
+  const state: WatchPartyState = { ...defaultState(), videoId: 'dQw4w9WgXcQ', isPlaying: true };
+  const result = wp.reduce(state, 'queue-add', {
+    provider: 'spotify',
+    videoId: 'spotify-episode-5SIS7xmznPY2CKDoTXYNmc',
+    mediaUrl: 'https://open.spotify.com/episode/5SIS7xmznPY2CKDoTXYNmc',
+    title: 'An episode',
+  });
+  assert.ok(result);
+  const added = result?.state.queue.at(-1);
+  assert.equal(added?.provider, 'spotify');
+  assert.equal(added?.mediaUrl, 'https://open.spotify.com/episode/5SIS7xmznPY2CKDoTXYNmc');
+});
+
 test('load-video: rejects a podcast id in the wrong shape (e.g. a bare YouTube-length id)', () => {
   assert.equal(
     wp.reduce(defaultState(), 'load-video', {
