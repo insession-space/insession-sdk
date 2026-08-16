@@ -1,6 +1,6 @@
 {
   "name": "@insession/docs",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "description": "@insession/* SDK の外部向けドキュメントサイト兼 LP（Astro + Starlight。npm には publish しない）",
   "//": "private: true。これは配布物ではなく Cloudflare Pages へデプロイする静的サイトなので、Changesets の採番対象からも npm publish の対象からも外す。",
   "private": true,
