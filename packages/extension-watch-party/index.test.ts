@@ -213,6 +213,54 @@ test('queue-add: spotify keeps its mediaUrl through sanitization', () => {
   assert.equal(added?.mediaUrl, 'https://open.spotify.com/episode/5SIS7xmznPY2CKDoTXYNmc');
 });
 
+// Third time for the same silent failure, one layer in: `spotify` was accepted
+// as a provider, but the id shape only allowed `episode`. Hosts that also offer
+// music search send `spotify-track-<id>` (and `album`/`playlist` for pasted
+// URLs), so `queue-add` returned `null` for every song — no queue entry, and no
+// `queue-rejected` either, because `null` means "nothing happened" rather than
+// "refused". The consuming client had already shown its own "added to queue"
+// toast by then.
+for (const kind of ['track', 'album', 'playlist', 'episode'] as const) {
+  test(`queue-add: accepts a spotify ${kind} id`, () => {
+    // Something must already be playing, otherwise `queue-add` auto-plays the
+    // item and pops it straight back off the queue.
+    const state: WatchPartyState = { ...defaultState(), videoId: 'dQw4w9WgXcQ', isPlaying: true };
+    const videoId = `spotify-${kind}-5SIS7xmznPY2CKDoTXYNmc`;
+    const result = wp.reduce(state, 'queue-add', {
+      provider: 'spotify',
+      videoId,
+      mediaUrl: `https://open.spotify.com/${kind}/5SIS7xmznPY2CKDoTXYNmc`,
+      title: `A ${kind}`,
+    });
+    assert.ok(result);
+    assert.equal(result?.state.queue.at(-1)?.videoId, videoId);
+  });
+
+  test(`load-video: accepts a spotify ${kind} id`, () => {
+    const videoId = `spotify-${kind}-5SIS7xmznPY2CKDoTXYNmc`;
+    const result = wp.reduce(defaultState(), 'load-video', {
+      provider: 'spotify',
+      videoId,
+      mediaUrl: `https://open.spotify.com/${kind}/5SIS7xmznPY2CKDoTXYNmc`,
+    });
+    assert.ok(result);
+    assert.equal(result?.state.videoId, videoId);
+  });
+}
+
+test('load-video: rejects a spotify id with an unknown kind', () => {
+  // `show` is a series, not something playable — the kind list is an allowlist,
+  // not decoration.
+  assert.equal(
+    wp.reduce(defaultState(), 'load-video', {
+      provider: 'spotify',
+      videoId: 'spotify-show-5SIS7xmznPY2CKDoTXYNmc',
+      mediaUrl: 'https://open.spotify.com/show/5SIS7xmznPY2CKDoTXYNmc',
+    }),
+    null,
+  );
+});
+
 test('load-video: rejects a podcast id in the wrong shape (e.g. a bare YouTube-length id)', () => {
   assert.equal(
     wp.reduce(defaultState(), 'load-video', {
