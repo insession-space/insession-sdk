@@ -13,7 +13,7 @@ export const MAX_HISTORY = 50;
 export const MAX_YOUTUBE_ID_LEN = 20; // Actual YouTube ids are 11 chars; this is just a pre-regex safety net.
 export const MAX_SOUNDCLOUD_ID_LEN = 160;
 export const MAX_PODCAST_ID_LEN = 40; // `podcast-<8 hex>-<8 hex>` is 26 chars; this is just a pre-regex safety net.
-export const MAX_SPOTIFY_ID_LEN = 40; // `spotify-episode-<22 chars>` is 38 chars; this is just a pre-regex safety net.
+export const MAX_SPOTIFY_ID_LEN = 40; // `spotify-playlist-<22 chars>` (the longest kind) is 39 chars; this is just a pre-regex safety net.
 export const MAX_TITLE_LEN = 200;
 export const MAX_URL_LEN = 500;
 const MAX_NAME_LEN = 100;
@@ -33,11 +33,16 @@ const SOUNDCLOUD_ID_RE = /^sc-(track|set)-[\w./-]{1,128}$/;
 // represents an episode with a pseudo-id of this shape (`podcast-<feed
 // hash>-<episode hash>`, both 8 hex chars). Same reasoning as above.
 const PODCAST_ID_RE = /^podcast-[0-9a-f]{8}-[0-9a-f]{8}$/;
-// Spotify episode ids are base62 and always 22 chars — a stable, public fact
-// about Spotify's id format. The app that ported this module prefixes them so
-// the shape alone identifies the provider (a bare 22-char id would otherwise be
-// indistinguishable from other opaque ids). Same reasoning as above.
-const SPOTIFY_ID_RE = /^spotify-episode-[A-Za-z0-9]{22}$/;
+// Spotify ids are base62 and always 22 chars — a stable, public fact about
+// Spotify's id format. The app that ported this module prefixes them with the
+// content kind so the shape alone identifies both the provider and what to
+// play (a bare 22-char id would otherwise be indistinguishable from other
+// opaque ids, and the same id space is reused across kinds). Same reasoning as
+// above.
+// ⚠ Keep this a superset: `spotify-episode-*` ids are already persisted by
+// hosts that shipped on an earlier version, so kinds may only ever be added.
+// `show` is deliberately absent — a show is a series, not something playable.
+const SPOTIFY_ID_RE = /^spotify-(?:track|album|playlist|episode)-[A-Za-z0-9]{22}$/;
 
 export function isValidMediaId(provider: WatchPartyProvider, id: unknown): id is string {
   if (typeof id !== 'string' || !id) return false;
